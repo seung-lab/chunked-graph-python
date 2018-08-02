@@ -178,14 +178,19 @@ def mincut(edges: Iterable[Sequence[np.uint64]], affs: Sequence[np.uint64],
     #     weighted_graph[edge[0]][edge[1]]['capacity'] = affs[i_edge]
 
     u_ids = np.unique(edges)
-    mapping = zip(np.arange(len(u_ids), dtype=np.int16), u_ids)
+    mapping = np.concatenate([u_ids[:, None], np.arange(len(u_ids), dtype=np.uint64)[:, None]], axis=1)
+
+    print(mapping)
 
     sort_idx = np.argsort(mapping[:, 0])
     idx = np.searchsorted(mapping[:, 0], edges, sorter=sort_idx)
     graph_edges = np.asarray(mapping[:, 1])[sort_idx][idx].astype(np.int16)
 
-    graph_source = mapping[mapping[0] == source][0]
-    graph_sink = mapping[mapping[0] == sink][0]
+    print("edges", edges)
+    print("new edges", graph_edges)
+
+    graph_source = mapping[:, 1][mapping[:, 0] == source][0]
+    graph_sink = mapping[:, 1][mapping[:, 0] == sink][0]
 
     weighted_graph = igraph.Graph(graph_edges.tolist())
 
@@ -211,10 +216,14 @@ def mincut(edges: Iterable[Sequence[np.uint64]], affs: Sequence[np.uint64],
     # cutset = minimum_st_edge_cut(weighted_graph, source, sink,
     #                              flow_func=flow_func)
 
-    cut = igraph.st_mincut(graph_source, graph_sink, capacity=affs)
-    cutset = cut[3]
+    print(graph_source, graph_sink, affs)
 
-    ccs = [cut[1], cut[2]]
+    mc = weighted_graph.st_mincut(np.int16(graph_source), np.int16(graph_sink),
+                                  capacity=affs.tolist())
+
+    cutset = mc.cut
+
+    # ccs = [cut[1], cut[2]]
 
     dt = time.time() - time_start
     print("Mincut: %.2fms" % (dt * 1000))
@@ -226,13 +235,17 @@ def mincut(edges: Iterable[Sequence[np.uint64]], affs: Sequence[np.uint64],
 
     # weighted_graph.remove_edges_from(cutset)
     # ccs = list(nx.connected_components(weighted_graph))
-    print("Graph split up in %d parts" % (len(ccs)))
+    # print("Graph split up in %d parts" % (len(ccs)))
 
-    for cc in ccs:
-        print("CC size = %d" % len(cc))
+    # for cc in ccs:
+    #     print("CC size = %d" % len(cc))
 
     dt = time.time() - time_start
     print("Test: %.2fms" % (dt * 1000))
+
+    sort_idx = np.argsort(mapping[:, 1])
+    idx = np.searchsorted(mapping[:, 1], cutset, sorter=sort_idx)
+    cutset = np.asarray(mapping[:, 0])[sort_idx][idx]
 
     return np.array(list(cutset), dtype=np.uint64)
 
@@ -434,7 +447,7 @@ class ChunkedGraph(object):
         return int(node_or_chunk_id) >> 64 - self._n_bits_for_layer_id
 
     def get_chunk_coordinates(self, node_or_chunk_id: np.uint64
-                              ) -> Tuple[int, int, int]:
+                              ) -> np.ndarray:
         """ Extract X, Y and Z coordinate from Node ID or Chunk ID
 
         :param node_or_chunk_id: np.uint64

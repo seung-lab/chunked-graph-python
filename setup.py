@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="PyChunkedGraph",
-    version="0.1",
+    version="0.2",
     author="Sven Dorkenwald",
     author_email="",
     description="Proofreading backend for Neuroglancer",
@@ -16,6 +16,7 @@ setup(
     install_requires=[
         "google-cloud-bigtable",
         "networkx",
+        "python-igraph",
         "cloud-volume",
         "bitstring"
     ],

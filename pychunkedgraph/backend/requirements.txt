@@ -1,3 +1,5 @@
 google-cloud
 cloud-volume
 networkx
+python-igraph
+igraph
