@@ -3,8 +3,10 @@ import numpy as np
 import time
 import datetime
 import os
+import igraph
 import networkx as nx
-from networkx.algorithms.flow import shortest_augmenting_path
+from networkx.algorithms.connectivity import minimum_st_edge_cut
+from networkx.algorithms.flow import shortest_augmenting_path, maximum_flow, preflow_push, edmonds_karp
 import pytz
 import cloudvolume
 
@@ -169,24 +171,50 @@ def mincut(edges: Iterable[Sequence[np.uint64]], affs: Sequence[np.uint64],
 
     time_start = time.time()
 
-    weighted_graph = nx.Graph()
-    weighted_graph.add_edges_from(edges)
+    # weighted_graph = nx.Graph()
+    # weighted_graph.add_edges_from(edges)
+    #
+    # for i_edge, edge in enumerate(edges):
+    #     weighted_graph[edge[0]][edge[1]]['capacity'] = affs[i_edge]
 
-    for i_edge, edge in enumerate(edges):
-        weighted_graph[edge[0]][edge[1]]['capacity'] = affs[i_edge]
+    u_ids = np.unique(edges)
+    mapping = zip(np.arange(len(u_ids), dtype=np.int16), u_ids)
+
+    sort_idx = np.argsort(mapping[:, 0])
+    idx = np.searchsorted(mapping[:, 0], edges, sorter=sort_idx)
+    graph_edges = np.asarray(mapping[:, 1])[sort_idx][idx].astype(np.int16)
+
+    graph_source = mapping[mapping[0] == source][0]
+    graph_sink = mapping[mapping[0] == sink][0]
+
+    weighted_graph = igraph.Graph(graph_edges.tolist())
+
+    # for i_edge in range(len(graph_edges)):
+    #     eid = weighted_graph.get_eid(graph_edges[i_edge][0],
+    #                                  graph_edges[i_edge][1])
+    #     edge = weighted_graph.es[eid]
+    #     edge["weight"] = affs[i_edge]
 
     dt = time.time() - time_start
     print("Graph creation: %.2fms" % (dt * 1000))
     time_start = time.time()
 
-    ccs = list(nx.connected_components(weighted_graph))
-    for cc in ccs:
-        if not (source in cc and sink in cc):
-            weighted_graph.remove_nodes_from(cc)
+    # ccs = list(nx.connected_components(weighted_graph))
+    # for cc in ccs:
+    #     if not (source in cc and sink in cc):
+    #         weighted_graph.remove_nodes_from(cc)
+    #
+    # flow_func = edmonds_karp
+    # print("Flow func:", flow_func)
+    # # cutset = nx.minimum_edge_cut(weighted_graph, source, sink,
+    # #                              flow_func=flow_func)
+    # cutset = minimum_st_edge_cut(weighted_graph, source, sink,
+    #                              flow_func=flow_func)
 
-    # cutset = nx.minimum_edge_cut(weighted_graph, source, sink)
-    cutset = nx.minimum_edge_cut(weighted_graph, source, sink,
-                                 flow_func=shortest_augmenting_path)
+    cut = igraph.st_mincut(graph_source, graph_sink, capacity=affs)
+    cutset = cut[3]
+
+    ccs = [cut[1], cut[2]]
 
     dt = time.time() - time_start
     print("Mincut: %.2fms" % (dt * 1000))
@@ -196,8 +224,8 @@ def mincut(edges: Iterable[Sequence[np.uint64]], affs: Sequence[np.uint64],
 
     time_start = time.time()
 
-    weighted_graph.remove_edges_from(cutset)
-    ccs = list(nx.connected_components(weighted_graph))
+    # weighted_graph.remove_edges_from(cutset)
+    # ccs = list(nx.connected_components(weighted_graph))
     print("Graph split up in %d parts" % (len(ccs)))
 
     for cc in ccs:
@@ -1491,7 +1519,7 @@ class ChunkedGraph(object):
         early_finish = True
 
         if self.get_chunk_layer(node_id) == self.n_layers:
-            raise Exception("node is already root")
+            return node_id
 
         parent_id = node_id
 
@@ -2719,6 +2747,7 @@ class ChunkedGraph(object):
 
         for atomic_edge in atomic_edges:
             if np.isinf(self.get_latest_edge_affinity(atomic_edge)):
+                print("Inf in edges")
                 return False, None
 
         atomic_edges = np.array(atomic_edges)
@@ -2997,6 +3026,7 @@ class ChunkedGraph(object):
                         old_next_layer_parent = old_parent_dict[parent_id]
 
                 if old_next_layer_parent is None:
+                    print("Something went wrong with the oldparents")
                     return False, None
 
                 cc_node_ids = np.array(list(parent_cc), dtype=np.uint64)

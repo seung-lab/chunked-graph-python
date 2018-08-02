@@ -155,8 +155,10 @@ def handle_split():
             x, y, z = node[1:]
 
             atomic_id = cg.get_atomic_id_from_coord(x, y, z,
-                                                    parent_id=np.uint64(node_id))
+                                                    parent_id=np.uint64(node_id),
+                                                    n_tries=10)
             if atomic_id is None:
+                print("Could not identify atomic ids")
                 return None
 
             data_dict[k].append({"id": atomic_id,
