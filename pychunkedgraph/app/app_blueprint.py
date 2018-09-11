@@ -87,28 +87,28 @@ def unhandled_exception(e):
 # -------------------
 
 
-@bp.route('/1.0/table', methods=['GET'])
+@bp.route('/1.0/tables', methods=['GET'])
 def handle_table():
     # Call ChunkedGraph
     cg = app_utils.get_cg()
 
     # Return binary
-    return cg.table_id
+    return list(cg._loaded_tables.keys())
 
-@bp.route('/1.0/graph/root', methods=['POST', 'GET'])
-def handle_root():
+@bp.route('/<table_id>/1.0/graph/root', methods=['POST', 'GET'])
+def handle_root(table_id):
     atomic_id = np.uint64(json.loads(request.data)[0])
 
     # Call ChunkedGraph
-    cg = app_utils.get_cg()
+    cg = app_utils.get_cg().get_chunkedgraph(table_id)
     root_id = cg.get_root(atomic_id)
 
     # Return binary
     return app_utils.tobinary(root_id)
 
 
-@bp.route('/1.0/graph/merge', methods=['POST', 'GET'])
-def handle_merge():
+@bp.route('/<table_id>/1.0/graph/merge', methods=['POST', 'GET'])
+def handle_merge(table_id):
     nodes = json.loads(request.data)
 
     assert len(nodes) == 2
@@ -116,7 +116,7 @@ def handle_merge():
     user_id = str(request.remote_addr)
 
     # Call ChunkedGraph
-    cg = app_utils.get_cg()
+    cg = app_utils.get_cg().get_chunkedgraph(table_id)
 
     atomic_edge = []
     for node in nodes:
@@ -147,14 +147,14 @@ def handle_merge():
     return app_utils.tobinary(new_root)
 
 
-@bp.route('/1.0/graph/split', methods=['POST', 'GET'])
-def handle_split():
+@bp.route('/table_id/1.0/graph/split', methods=['POST', 'GET'])
+def handle_split(table_id):
     data = json.loads(request.data)
 
     user_id = str(request.remote_addr)
 
     # Call ChunkedGraph
-    cg = app_utils.get_cg()
+    cg = app_utils.get_cg().get_chunkedgraph(table_id)
 
     data_dict = {}
     for k in ["sources", "sinks"]:
@@ -186,10 +186,10 @@ def handle_split():
     return app_utils.tobinary(new_roots)
 
 
-@bp.route('/1.0/segment/<parent_id>/children', methods=['POST', 'GET'])
-def handle_children(parent_id):
+@bp.route('/table_id/1.0/segment/<parent_id>/children', methods=['POST', 'GET'])
+def handle_children(table_id, parent_id):
     # Call ChunkedGraph
-    cg = app_utils.get_cg()
+    cg = app_utils.get_cg().get_chunkedgraph(table_id)
 
     parent_id = np.uint64(parent_id)
     layer = cg.get_chunk_layer(parent_id)
@@ -212,8 +212,8 @@ def handle_children(parent_id):
     return app_utils.tobinary(children)
 
 
-@bp.route('/1.0/segment/<root_id>/leaves', methods=['POST', 'GET'])
-def handle_leaves(root_id):
+@bp.route('/table_id/1.0/segment/<root_id>/leaves', methods=['POST', 'GET'])
+def handle_leaves(table_id, root_id):
     if "bounds" in request.args:
         bounds = request.args["bounds"]
         bounding_box = np.array([b.split("-") for b in bounds.split("_")],
@@ -222,7 +222,7 @@ def handle_leaves(root_id):
         bounding_box = None
 
     # Call ChunkedGraph
-    cg = app_utils.get_cg()
+    cg = app_utils.get_cg().get_chunkedgraph(table_id)
     atomic_ids = cg.get_subgraph(int(root_id),
                                  bounding_box=bounding_box,
                                  bb_is_coordinate=True)
@@ -231,9 +231,9 @@ def handle_leaves(root_id):
     return app_utils.tobinary(atomic_ids)
 
 
-@bp.route('/1.0/segment/<atomic_id>/leaves_from_leave',
+@bp.route('/table_id/1.0/segment/<atomic_id>/leaves_from_leave',
           methods=['POST', 'GET'])
-def handle_leaves_from_leave(atomic_id):
+def handle_leaves_from_leave(table_id, atomic_id):
     if "bounds" in request.args:
         bounds = request.args["bounds"]
         bounding_box = np.array([b.split("-") for b in bounds.split("_")],
@@ -242,7 +242,7 @@ def handle_leaves_from_leave(atomic_id):
         bounding_box = None
 
     # Call ChunkedGraph
-    cg = app_utils.get_cg()
+    cg = app_utils.get_cg().get_chunkedgraph(table_id)
     root_id = cg.get_root(int(atomic_id))
 
     atomic_ids = cg.get_subgraph(root_id,
@@ -252,8 +252,8 @@ def handle_leaves_from_leave(atomic_id):
     return app_utils.tobinary(np.concatenate([np.array([root_id]), atomic_ids]))
 
 
-@bp.route('/1.0/segment/<root_id>/subgraph', methods=['POST', 'GET'])
-def handle_subgraph(root_id):
+@bp.route('/table_id/1.0/segment/<root_id>/subgraph', methods=['POST', 'GET'])
+def handle_subgraph(table_id, root_id):
     if "bounds" in request.args:
         bounds = request.args["bounds"]
         bounding_box = np.array([b.split("-") for b in bounds.split("_")],
@@ -262,7 +262,7 @@ def handle_subgraph(root_id):
         bounding_box = None
 
     # Call ChunkedGraph
-    cg = app_utils.get_cg()
+    cg = app_utils.get_cg().get_chunkedgraph(table_id)
     atomic_edges = cg.get_subgraph(int(root_id),
                                    get_edges=True,
                                    bounding_box=bounding_box,

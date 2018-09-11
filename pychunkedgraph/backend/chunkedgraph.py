@@ -1684,7 +1684,6 @@ class ChunkedGraph(object):
         spacing = np.linspace(0, len(ccs), n_jobs+1).astype(np.int)
         starts = spacing[:-1]
         ends = spacing[1:]
-
         multi_args = list(zip(starts, ends))
 
         mu.multithread_func(_write_out_connected_components, multi_args,

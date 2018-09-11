@@ -5,7 +5,7 @@ from google.cloud import bigtable
 import numpy as np
 
 # Hack the imports for now
-from pychunkedgraph.backend import chunkedgraph
+from pychunkedgraph.backend import meta_chunkedgraph
 
 
 class DoNothingCreds(credentials.Credentials):
@@ -29,10 +29,9 @@ def get_client(config):
 
 def get_cg():
     if 'cg' not in g:
-        table_id = current_app.config['CHUNKGRAPH_TABLE_ID']
+        # table_id = current_app.config['CHUNKGRAPH_TABLE_ID']
         client = get_client(current_app.config)
-        g.cg = chunkedgraph.ChunkedGraph(table_id=table_id,
-                                         client=client)
+        g.cg = meta_chunkedgraph.PyChunkedGraphMeta(client=client)
     return g.cg
 
 
