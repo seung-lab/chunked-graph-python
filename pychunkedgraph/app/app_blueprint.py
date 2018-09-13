@@ -123,6 +123,9 @@ def handle_merge():
         node_id = node[0]
         x, y, z = node[1:]
 
+        x /= 2
+        y /= 2
+
         atomic_id = cg.get_atomic_id_from_coord(x, y, z,
                                                 parent_id=np.uint64(node_id))
         if atomic_id is None:
@@ -164,6 +167,9 @@ def handle_split():
             node_id = node[0]
             x, y, z = node[1:]
 
+            x /= 2
+            y /= 2
+
             atomic_id = cg.get_atomic_id_from_coord(x, y, z,
                                                     parent_id=np.uint64(node_id))
             if atomic_id is None:
@@ -171,6 +177,8 @@ def handle_split():
 
             data_dict[k].append({"id": atomic_id,
                                  "coord": np.array([x, y, z])})
+
+    print(data_dict)
 
     new_roots = cg.remove_edges(user_id=user_id,
                                 source_id=data_dict["sources"][0]["id"],
