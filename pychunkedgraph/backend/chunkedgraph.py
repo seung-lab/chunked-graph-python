@@ -8,7 +8,7 @@ import pytz
 import cloudvolume
 
 from pychunkedgraph.parallelizing import multiprocessing_utils as mu
-from . import mincut
+from pychunkedgraph.backend import cutting
 
 from google.api_core.retry import Retry, if_exception_type
 from google.api_core.exceptions import Aborted, DeadlineExceeded, \
@@ -18,7 +18,7 @@ from google.cloud import bigtable
 from google.cloud.bigtable.row_filters import TimestampRange, \
     TimestampRangeFilter, ColumnRangeFilter, ValueRangeFilter, RowFilterChain, \
     ColumnQualifierRegexFilter, RowFilterUnion, ConditionalRowFilter, \
-    PassAllFilter
+    PassAllFilter, BlockAllFilter
 from google.cloud.bigtable.column_family import MaxVersionsGCRule
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
@@ -26,7 +26,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 # global variables
 HOME = os.path.expanduser("~")
 N_DIGITS_UINT64 = len(str(np.iinfo(np.uint64).max))
-LOCK_EXPIRED_TIME_DELTA = datetime.timedelta(minutes=2, seconds=00)
+LOCK_EXPIRED_TIME_DELTA = datetime.timedelta(minutes=0, seconds=5)
 UTC = pytz.UTC
 
 # Setting environment wide credential path
@@ -2792,10 +2792,14 @@ class ChunkedGraph(object):
                      np.array([atomic_edge[(i_atomic_id + 1) % 2]]).tobytes(),
                  "atomic_connected_affinities":
                      np.array([affinity], dtype=np.float32).tobytes(),
+                 "atomic_connected_areas":
+                     np.array([1], dtype=np.np.uint64).tobytes(),
                  "atomic_disconnected_partners":
                      np.array([atomic_edge[(i_atomic_id + 1) % 2]]).tobytes(),
                  "atomic_disconnected_affinities":
-                     np.array([0], dtype=np.float32).tobytes()
+                     np.array([0], dtype=np.float32).tobytes(),
+                 "atomic_disconnected_areas":
+                     np.array([1], dtype=np.uint64).tobytes()
                  }
 
             rows.append(self.mutate_row(serialize_uint64(
@@ -2973,8 +2977,8 @@ class ChunkedGraph(object):
             print("root(source) != root(sink)")
             return False, None
 
-        print(
-            "Get roots and check: %.3fms" % ((time.time() - time_start) * 1000))
+        print("Get roots and check: %.3fms" %
+              ((time.time() - time_start) * 1000))
         time_start = time.time()  # ------------------------------------------
 
         root_id = root_id_source
@@ -2997,7 +3001,7 @@ class ChunkedGraph(object):
         time_start = time.time()  # ------------------------------------------
 
         # Compute mincut
-        atomic_edges = mincut.mincut(edges, affs, source_id, sink_id)
+        atomic_edges = cutting.mincut(edges, affs, source_id, sink_id)
 
         print("Mincut: %.3fms" % ((time.time() - time_start) * 1000))
         time_start = time.time()  # ------------------------------------------
