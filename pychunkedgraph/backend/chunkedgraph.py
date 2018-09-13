@@ -28,7 +28,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 # global variables
 HOME = os.path.expanduser("~")
 N_DIGITS_UINT64 = len(str(np.iinfo(np.uint64).max))
-LOCK_EXPIRED_TIME_DELTA = datetime.timedelta(minutes=2, seconds=00)
+LOCK_EXPIRED_TIME_DELTA = datetime.timedelta(minutes=0, seconds=5)
 UTC = pytz.UTC
 
 # Setting environment wide credential path
@@ -49,11 +49,11 @@ def compute_sparse_indices(arr: np.ndarray) -> sparse.csr_matrix:
 
 def compute_indices_pandas(data) -> pd.Series:
     """ Computes indices of all unique entries
-    
+
     Make sure to remap your array to a dense range starting at zero
-    
+
     https://stackoverflow.com/questions/33281957/faster-alternative-to-numpy-where
-    
+
     :param data: np.ndarray
     :return: pandas dataframe
     """
@@ -3058,7 +3058,7 @@ class ChunkedGraph(object):
                  "atomic_disconnected_affinities":
                      np.array([0], dtype=np.float32).tobytes(),
                  "atomic_disconnected_areas":
-                     np.array([0], dtype=np.uint64).tobytes()
+                     np.array([1], dtype=np.uint64).tobytes()
                  }
 
             rows.append(self.mutate_row(serialize_uint64(
@@ -3260,7 +3260,7 @@ class ChunkedGraph(object):
         time_start = time.time()  # ------------------------------------------
 
         # Compute mincut
-        atomic_edges = mincut.mincut(edges, affs, source_id, sink_id)
+        atomic_edges = cutting.mincut(edges, affs, source_id, sink_id)
 
         print("Mincut: %.3fms" % ((time.time() - time_start) * 1000))
         time_start = time.time()  # ------------------------------------------
