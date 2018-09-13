@@ -3058,7 +3058,7 @@ class ChunkedGraph(object):
                  "atomic_disconnected_affinities":
                      np.array([0], dtype=np.float32).tobytes(),
                  "atomic_disconnected_areas":
-                     np.array([1], dtype=np.uint64).tobytes()
+                     np.array([0], dtype=np.uint64).tobytes()
                  }
 
             rows.append(self.mutate_row(serialize_uint64(
