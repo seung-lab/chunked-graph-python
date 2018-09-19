@@ -2691,6 +2691,7 @@ class ChunkedGraph(object):
 
         r = self.table.read_row(serialize_uint64(atomic_id),
                                 filter_=filter_)
+        print(r.cells)
 
         for edge_key, affinity_key, area_key in \
                 zip(edge_keys, affinity_keys, area_keys):
@@ -2757,8 +2758,9 @@ class ChunkedGraph(object):
         partners_m = affinities > 0
         partners = partners[partners_m]
         affinities = affinities[partners_m]
+        areas = areas[partners_m]
 
-        return partners, affinities
+        return partners, affinities, areas
 
     def get_subgraph_chunk(self, parent_id: np.uint64, make_unique: bool = True,
                            time_stamp: Optional[datetime.datetime] = None
