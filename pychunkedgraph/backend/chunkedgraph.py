@@ -2423,14 +2423,17 @@ class ChunkedGraph(object):
 
         edge_keys = []
         affinity_keys = []
+        area_keys = []
 
         if include_connected_partners:
             edge_keys.append(serialize_key('atomic_connected_partners'))
             affinity_keys.append(serialize_key('atomic_connected_affinities'))
+            area_keys.append(serialize_key('atomic_connected_areas'))
 
         if include_disconnected_partners:
             edge_keys.append(serialize_key('atomic_disconnected_partners'))
             affinity_keys.append(serialize_key('atomic_disconnected_affinities'))
+            area_keys.append(serialize_key('atomic_disconnected_areas'))
 
         filters = [ColumnQualifierRegexFilter(k) for k in
                    edge_keys + affinity_keys if k is not None]
@@ -2439,11 +2442,14 @@ class ChunkedGraph(object):
 
         partners = np.array([], dtype=np.uint64)
         affinities = np.array([], dtype=np.float32)
+        areas = np.array([], dtype=np.uint64)
 
         r = self.table.read_row(serialize_uint64(atomic_id),
                                 filter_=filter_)
+        print(r.cells)
 
-        for edge_key, affinity_key in zip(edge_keys, affinity_keys):
+        for edge_key, affinity_key, area_key in \
+                zip(edge_keys, affinity_keys, area_keys):
             # Shortcut for the trivial case that there have been no changes to
             # the edges of this child:
             if len(r.cells[self.family_id][edge_key]) == 0:
@@ -2460,6 +2466,15 @@ class ChunkedGraph(object):
                         np.frombuffer(r.cells[self.family_id][affinity_key][0].value,
                                       dtype=np.float32)
                     affinities = np.concatenate([affinities, this_affinities])
+
+                if area_key is None:
+                    areas = np.concatenate([
+                        areas, np.full((len(this_partners)), 0)])
+                else:
+                    this_areas = \
+                        np.frombuffer(r.cells[self.family_id][area_key][0].value,
+                                      dtype=np.uint64)
+                    areas = np.concatenate([areas, this_areas])
 
             # From new to old: Add partners that are not
             # in the edge list of this child. This assures that more recent
@@ -2498,8 +2513,9 @@ class ChunkedGraph(object):
         partners_m = affinities > 0
         partners = partners[partners_m]
         affinities = affinities[partners_m]
+        areas = areas[partners_m]
 
-        return partners, affinities
+        return partners, affinities, areas
 
     def get_subgraph_chunk(self, parent_id: np.uint64, make_unique: bool = True,
                            time_stamp: Optional[datetime.datetime] = None
@@ -2793,7 +2809,7 @@ class ChunkedGraph(object):
                  "atomic_connected_affinities":
                      np.array([affinity], dtype=np.float32).tobytes(),
                  "atomic_connected_areas":
-                     np.array([1], dtype=np.np.uint64).tobytes(),
+                     np.array([1], dtype=np.uint64).tobytes(),
                  "atomic_disconnected_partners":
                      np.array([atomic_edge[(i_atomic_id + 1) % 2]]).tobytes(),
                  "atomic_disconnected_affinities":
