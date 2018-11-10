@@ -9,7 +9,7 @@ import logging
 import time
 
 # Hack the imports for now
-from pychunkedgraph.backend import chunkedgraph
+from pychunkedgraph.backend import chunkedgraph_meta
 from pychunkedgraph.logging import flask_log_db
 
 cache = {}
@@ -46,8 +46,8 @@ def get_datastore_client(config):
     return client
 
 
-def get_cg():
-    if 'cg' not in cache:
+def get_mcg():
+    if 'mcg' not in cache:
         instance_id = current_app.config['CHUNKGRAPH_INSTANCE_ID']
         table_id = current_app.config['CHUNKGRAPH_TABLE_ID']
         client = get_bigtable_client(current_app.config)
@@ -70,11 +70,11 @@ def get_cg():
         logger.addHandler(handler)
 
         # Create ChunkedGraph
-        cache["cg"] = chunkedgraph.ChunkedGraph(instance_id=instance_id,
-                                                table_id=table_id,
-                                                client=client,
-                                                logger=logger)
-    return cache["cg"]
+        cache["mcg"] = chunkedgraph_meta.ChunkedGraphMeta(instance_id=instance_id,
+                                                          table_id=table_id,
+                                                          client=client,
+                                                          logger=logger)
+    return cache["mcg"]
 
 
 def get_log_db():
