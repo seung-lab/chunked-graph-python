@@ -1,3 +1,4 @@
+dist: xenial
 sudo: true
 language: python
 python:
@@ -28,6 +29,12 @@ jobs:
       python: 3.6
 
       before_install:
+        # Graph-Tool
+        - export GRAPH_TOOL_REPO="$(lsb_release -c -s)"
+        - echo "deb http://downloads.skewed.de/apt/$GRAPH_TOOL_REPO $GRAPH_TOOL_REPO universe" | sudo tee -a /etc/apt/sources.list.d/graph-tool.list
+        - echo "deb-src http://downloads.skewed.de/apt/$GRAPH_TOOL_REPO $GRAPH_TOOL_REPO universe" | sudo tee -a /etc/apt/sources.list.d/graph-tool.list
+        - sudo apt-key adv --keyserver pgp.skewed.de --recv-key 612DEFB798507F25
+        # Google Cloud SDK + Bigtable Emulator
         - if [ ! -d $HOME/google-cloud-sdk/bin ]; then
             rm -rf $HOME/google-cloud-sdk;
             curl https://sdk.cloud.google.com | bash > /dev/null;
@@ -41,7 +48,7 @@ jobs:
         - lsb_release -a
 
       install:
-        - sudo apt update && sudo apt install -y build-essential libboost-dev
+        - sudo apt update && sudo apt install -y build-essential libboost-dev python3-graph-tool
         - pip install tox-travis codecov
 
       before_script:

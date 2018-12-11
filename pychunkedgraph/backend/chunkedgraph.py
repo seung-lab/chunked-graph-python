@@ -5,6 +5,7 @@ import datetime
 import os
 import sys
 import networkx as nx
+from graph_tool.all import *
 import pytz
 import cloudvolume
 import re
