@@ -34,6 +34,7 @@ jobs:
         - echo "deb http://downloads.skewed.de/apt/$GRAPH_TOOL_REPO $GRAPH_TOOL_REPO universe" | sudo tee -a /etc/apt/sources.list.d/graph-tool.list
         - echo "deb-src http://downloads.skewed.de/apt/$GRAPH_TOOL_REPO $GRAPH_TOOL_REPO universe" | sudo tee -a /etc/apt/sources.list.d/graph-tool.list
         - sudo apt-key adv --keyserver pgp.skewed.de --recv-key 612DEFB798507F25
+        - echo "/usr/lib/python3/dist-packages/" | tee -a /usr/lib/python3.6/site-packages/dist-packages.pth
         # Google Cloud SDK + Bigtable Emulator
         - if [ ! -d $HOME/google-cloud-sdk/bin ]; then
             rm -rf $HOME/google-cloud-sdk;
@@ -42,6 +43,7 @@ jobs:
         - source $HOME/google-cloud-sdk/path.bash.inc
         - gcloud components update beta
         - gcloud components install bigtable
+        # Version Summary
         - gcloud version
         - python --version
         - uname -a
