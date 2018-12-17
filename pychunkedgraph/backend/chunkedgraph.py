@@ -39,7 +39,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, 
 
 HOME = os.path.expanduser("~")
 N_DIGITS_UINT64 = len(str(np.iinfo(np.uint64).max))
-LOCK_EXPIRED_TIME_DELTA = datetime.timedelta(minutes=1, seconds=00)
+LOCK_EXPIRED_TIME_DELTA = datetime.timedelta(minutes=0, seconds=1)
 UTC = pytz.UTC
 
 # Setting environment wide credential path
@@ -3625,6 +3625,8 @@ class ChunkedGraph(object):
                 # if len(sink_ids) > 1 or len(source_ids) > 1:
                 #     self.logger.debug(removed_edges)
                 # else:
+
+
                 if self.bulk_write(rows, lock_root_ids,
                                    operation_id=operation_id, slow_retry=False):
                     if remesh_preview:
@@ -3726,7 +3728,22 @@ class ChunkedGraph(object):
         time_start = time.time()  # ------------------------------------------
 
         # Compute mincut
-        atomic_edges = cutting.mincut(edges, affs, source_ids, sink_ids)
+        atomic_edges_nx = cutting.mincut_nx(edges, affs, np.array(source_ids).copy(), np.array(sink_ids).copy(),
+                                            logger=self.logger)
+        # atomic_edges = cutting.mincut_igraph(edges, affs, source_ids, sink_ids,
+        #                                      logger=self.logger)
+        atomic_edges = cutting.mincut_graph_tool(edges, affs, source_ids,
+                                                 sink_ids, logger=self.logger)
+
+        self.logger.debug(f"EDGES NX: {atomic_edges_nx}")
+        self.logger.debug(f"EDGES graph-tool: {atomic_edges}")
+
+        self.logger.debug(f"EDGES NX: {len(atomic_edges_nx)}")
+        self.logger.debug(f"EDGES graph-tool: {len(atomic_edges)}")
+
+
+        # assert np.array_equal(np.sort(atomic_edges_nx, axis=0),
+        #                       np.sort(atomic_edges, axis=0))
 
         self.logger.debug("Mincut: %.3fms" % ((time.time() - time_start) * 1000))
         time_start = time.time()  # ------------------------------------------
@@ -3746,7 +3763,7 @@ class ChunkedGraph(object):
             self.logger.error("inf in cutset")
             return False, None
 
-        # Remove edgesc
+        # Remove edges
         success, result = self._remove_edges(operation_id, atomic_edges)
 
         if not success:
