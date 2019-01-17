@@ -2488,6 +2488,68 @@ class ChunkedGraph(object):
 
         return history_ids
 
+
+    def get_change_log(self, root_id: np.uint64, log_merges: bool = True,
+                       log_splits: bool = True):
+
+        id_history = []
+        merge_history = []
+        split_history = []
+
+        next_ids = [root_id]
+        while len(next_ids):
+            temp_next_ids = []
+
+            for next_id in next_ids:
+                columns = [column_keys.Hierarchy.FormerParent]
+                row = self.read_node_id_row(next_id, columns=columns)
+
+                if column_keys.Hierarchy.FormerParent in row:
+                    ids = row[columns[0]][0].value
+
+                    if len(ids) == 2:
+                        is_merge = True
+                    else:
+                        is_merge = False
+
+                    for id_ in ids:
+                        if id_ in id_history:
+                            continue
+
+                        id_history.append(id_)
+                        temp_next_ids.append(id_)
+
+                    if is_merge and log_merges:
+                        id_ = ids[0]
+                        columns = [column_keys.Concurrency.Lock]
+                        former_row = self.read_node_id_row(id_, columns=columns)
+                        operation_id = former_row[columns[0]][0].value
+
+                        log_row = self.read_log_row(operation_id)
+                        added_edges = log_row[column_keys.OperationLogs.AddedEdge][0].value
+
+                        merge_history.append(added_edges)
+
+                    if not is_merge and log_splits:
+                        id_ = ids[0]
+                        columns = [column_keys.Concurrency.Lock]
+                        former_row = self.read_node_id_row(id_, columns=columns)
+                        operation_id = former_row[columns[0]][0].value
+
+                        log_row = self.read_log_row(operation_id)
+                        removed_edges = log_row[column_keys.OperationLogs.RemovedEdge][0].value
+
+                        split_history.append(removed_edges)
+                else:
+                    continue
+
+            next_ids = temp_next_ids
+
+        return np.unique(np.array(id_history, dtype=np.uint64))
+
+
+
+
     def normalize_bounding_box(self,
                                bounding_box: Optional[Sequence[Sequence[int]]],
                                bb_is_coordinate: bool) -> \
