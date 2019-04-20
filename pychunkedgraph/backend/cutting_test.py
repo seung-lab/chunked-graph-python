@@ -132,11 +132,41 @@ def test_gigantic(n=100000):
     sh.setLevel(logging.DEBUG)
     logger.addHandler(sh)
 
-    sources = np.unique(edges)[:100]
-    sinks = np.unique(edges)[-100:]
+    sources = np.unique(edges)[:10]
+    sinks = np.unique(edges)[-10:]
 
     time_start = time.time()
     out_gt = cutting.mincut_graph_tool(edges, weights, sources, sinks, logger=logger)
     time_gt = time.time() - time_start
 
     print("Time graph_tool: %.3fs" % (time_gt))
+
+
+def test_graph_gt(edges, weights, sources, sinks):
+    logger = logging.getLogger("%d" % np.random.randint(0, 100000))
+    logger.setLevel(logging.DEBUG)
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setLevel(logging.DEBUG)
+    logger.addHandler(sh)
+
+    time_start = time.time()
+    out_gt = cutting.mincut_graph_tool(edges, weights, sources, sinks, logger=logger)
+    time_gt = time.time() - time_start
+
+    print("Time graph_tool: %.3fs" % (time_gt))
+
+
+def test_graph_nx(edges, weights, sources, sinks):
+    logger = logging.getLogger("%d" % np.random.randint(0, 100000))
+    logger.setLevel(logging.DEBUG)
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setLevel(logging.DEBUG)
+    logger.addHandler(sh)
+
+    time_start = time.time()
+    out_nx = cutting.mincut_nx(edges, weights, sources, sinks, logger=logger)
+    time_nx = time.time() - time_start
+
+    print("Time networkx: %.3fs" % (time_nx))
+
+    return out_nx

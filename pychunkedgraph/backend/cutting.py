@@ -7,13 +7,14 @@ from networkx.algorithms.flow import shortest_augmenting_path, edmonds_karp, pre
 from networkx.algorithms.connectivity import minimum_st_edge_cut
 import time
 import graph_tool.flow
+import graph_tool.topology
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from pychunkedgraph.backend import flatgraph_utils
 
 float_max = np.finfo(np.float32).max
-
+# float_max = 100
 
 def merge_cross_chunk_edges(edges: Iterable[Sequence[np.uint64]],
                             affs: Sequence[np.uint64],
@@ -323,8 +324,11 @@ def mincut_graph_tool(edges: Iterable[Sequence[np.uint64]],
         logger.debug("Graph creation: %.2fms" % (dt * 1000))
     time_start = time.time()
 
-    # # Get rid of connected components that are not involved in the local
-    # # mincut
+    cc_prop, ns = graph_tool.topology.label_components(weighted_graph)
+    print(f"Number of connected components: {ns}")
+
+    # Get rid of connected components that are not involved in the local
+    # mincut
     # cc_prop, ns = graph_tool.topology.label_components(weighted_graph)
     #
     # if len(ns) > 1:
@@ -343,8 +347,7 @@ def mincut_graph_tool(edges: Iterable[Sequence[np.uint64]],
     src, tgt = weighted_graph.vertex(source_graph_ids[0]), \
                weighted_graph.vertex(sink_graph_ids[0])
 
-    res = graph_tool.flow.boykov_kolmogorov_max_flow(weighted_graph,
-                                                     src, tgt, cap)
+    res = graph_tool.flow.boykov_kolmogorov_max_flow(weighted_graph, src, tgt, cap)
 
     part = graph_tool.flow.min_st_cut(weighted_graph, src, cap, res)
 
