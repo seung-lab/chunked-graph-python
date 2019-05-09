@@ -15,5 +15,6 @@ redis
 rq
 zmesh
 fastremap
+scipy
 # igneous==dev
 DracoPy>=0.0.10

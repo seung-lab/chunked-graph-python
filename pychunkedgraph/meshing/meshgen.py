@@ -894,6 +894,7 @@ def black_out_dust_from_segmentation(seg, dust_threshold):
 
 
 def chunk_mesh_task_new_remapping(cg, chunk_id, cv_path, cv_mesh_dir=None, mip=2, max_err=40, base_layer=2, lod=0, encoding='draco', time_stamp=None, dust_threshold=None):
+    start_time = time.time()
     mesh_dir = cv_mesh_dir or cg._mesh_dir
 
     layer, mesh_block_shape, chunk_offset = get_meshing_necessities_from_graph(cg, chunk_id, mip)
@@ -905,40 +906,56 @@ def chunk_mesh_task_new_remapping(cg, chunk_id, cv_path, cv_mesh_dir=None, mip=2
         print("Retrieving remap table for chunk %s -- (%s, %s, %s, %s)" % (chunk_id, layer, cx, cy, cz))
         mesher = zmesh.Mesher(cg.cv.resolution)
         draco_encoding_settings = get_draco_encoding_settings_for_chunk(cg, chunk_id, mip, high_padding)
+        before_time = time.time()
         seg = get_remapped_segmentation(cg, chunk_id, mip, overlap_vx=high_padding, time_stamp=time_stamp)
-        import ipdb
-        ipdb.set_trace()
+        print('get_remapped_seg time: ', time.time() - before_time)
         if dust_threshold:
+            before_time = time.time()
             black_out_dust_from_segmentation(seg, dust_threshold)
+            print('dust removal time: ', time.time() - before_time)
         print('get root cache: ', get_root_lx_remapping.cache_info())
         # print(draco_encoding_settings)
+        before_time = time.time()
         mesher.mesh(seg.T)
+        print('mesh time: ', time.time() - before_time)
         del seg
+        simplification_time = 0
+        draco_encoding_time = 0
+        write_to_cloud_time = 0
         with Storage(cv_path) as storage:
             for obj_id in mesher.ids():
+                before_time = time.time()
                 mesh = mesher.get_mesh(
                     obj_id,
                     simplification_factor=999999,
                     max_simplification_error=max_err
                 )
+                simplification_time = simplification_time + time.time() - before_time
                 mesher.erase(obj_id)
                 mesh.vertices[:] += chunk_offset * cg.cv.resolution
                 if encoding == 'draco':
+                    before_time = time.time()                    
                     file_contents = DracoPy.encode_mesh_to_buffer(
                         mesh.vertices.flatten('C'), mesh.faces.flatten('C'), 
                         **draco_encoding_settings
                     )
+                    draco_encoding_time = draco_encoding_time + time.time() - before_time
                     compress = False
                 else:
                     file_contents = mesh.to_precomputed()
                     compress = True
+                before_time = time.time()
                 storage.put_file(
                     file_path=f'{mesh_dir}/{meshgen_utils.get_mesh_name(cg, obj_id, mip)}',
                     content=file_contents,
                     compress=compress,
                     cache_control='no-cache'
                 )
-
+                write_to_cloud_time = write_to_cloud_time + time.time() - before_time
+        print('simplification time: ', simplification_time)
+        print('draco encoding time: ', draco_encoding_time)
+        print('write to cloud time: ', write_to_cloud_time)
+        print('total_time: ', time.time() - start_time)
     
     else:
         # For each node with more than one child, create a new fragment by
