@@ -390,6 +390,7 @@ def get_root_lx_remapping(cg, chunk_id, stop_layer, time_stamp, n_threads=20):
                                   time_stamp=time_stamp)
             root_ids[i_id] = root_id
 
+    before_time = time.time()
     lx_id_remap = get_higher_to_lower_remapping(cg, chunk_id, time_stamp=time_stamp)
 
     lx_ids = np.array(list(lx_id_remap.keys()))
@@ -400,10 +401,10 @@ def get_root_lx_remapping(cg, chunk_id, stop_layer, time_stamp, n_threads=20):
     start_ids = np.linspace(0, len(lx_ids), n_jobs + 1).astype(np.int)
     for i_block in range(n_jobs):
         multi_args.append([start_ids[i_block], start_ids[i_block + 1]])
-
+    print('get_root_lx inside time: ', time.time() - before_time)
     if n_jobs > 0:
         mu.multithread_func(_get_root_ids, multi_args, n_threads=n_threads)
-
+    
     return lx_ids, np.array(root_ids), lx_id_remap
 
 
@@ -470,9 +471,13 @@ def get_lx_overlapping_remappings(cg, chunk_id, time_stamp=None):
     for neigh_chunk_id in neigh_chunk_ids:
         print(f"Neigh: {neigh_chunk_id} --------------")
 
+        before_time = time.time()
         lx_ids, root_ids, lx_id_remap = \
             get_root_lx_remapping(cg, neigh_chunk_id, stop_layer,
                                   time_stamp=time_stamp)
+        print('get_root_lx_remapping time: ', time.time() - before_time)
+        # import ipdb
+        # ipdb.set_trace()
         neigh_lx_ids.extend(lx_ids)
         neigh_lx_id_remap.update(lx_id_remap)
         neigh_root_ids.extend(root_ids)
