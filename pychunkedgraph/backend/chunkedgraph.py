@@ -89,9 +89,12 @@ class ChunkedGraph(object):
         if is_new:
             self._check_and_create_table()
 
-        self._dataset_info = self.check_and_write_table_parameters(
-            column_keys.GraphSettings.DatasetInfo, dataset_info,
-            required=True, is_new=is_new)
+        if dataset_info:
+           self._dataset_info = dataset_info
+        else:
+           self._dataset_info = self.check_and_write_table_parameters(
+               column_keys.GraphSettings.DatasetInfo, dataset_info,
+               required=True, is_new=is_new)
 
         self._cv_path = self._dataset_info["data_dir"]         # required
         self._mesh_dir = self._dataset_info.get("mesh", None)  # optional
