@@ -17,7 +17,8 @@ def ingest_into_chunkedgraph(storage_path, ws_cv_path, cg_table_id,
                              chunk_size=[256, 256, 512],
                              use_skip_connections=True,
                              s_bits_atomic_layer=None,
-                             fan_out=2, aff_dtype=np.float32,
+                             fan_out=2,
+                             data_version=2,
                              size=None,
                              instance_id=None, project_id=None,
                              start_layer=1, n_threads=[64, 64]):
@@ -65,14 +66,15 @@ def ingest_into_chunkedgraph(storage_path, ws_cv_path, cg_table_id,
                                            cg_table_id=cg_table_id,
                                            n_layers=n_layers_agg,
                                            instance_id=instance_id,
-                                           project_id=project_id)
+                                           project_id=project_id,
+                                           data_version=data_version)
 
     # #TODO: Remove later:
     # logging.basicConfig(level=logging.DEBUG)
     # im.cg.logger = logging.getLogger(__name__)
     # ------------------------------------------
     if start_layer < 3:
-        create_atomic_chunks(im, aff_dtype=aff_dtype, n_threads=n_threads[0])
+        create_atomic_chunks(im, n_threads=n_threads[0])
 
     create_abstract_layers(im, n_threads=n_threads[1], start_layer=start_layer)
 
@@ -221,7 +223,7 @@ def _create_atomic_chunk(args):
               (time.time() - time_start))
 
 
-def create_atomic_chunk(im, chunk_coord, aff_dtype=np.float32, verbose=True):
+def create_atomic_chunk(im, chunk_coord, verbose=True):
     """ Creates single atomic chunk
 
     :param im: IngestionManager
@@ -234,7 +236,8 @@ def create_atomic_chunk(im, chunk_coord, aff_dtype=np.float32, verbose=True):
     """
     chunk_coord = np.array(list(chunk_coord), dtype=np.int)
 
-    edge_dict = collect_edge_data(im, chunk_coord, aff_dtype=aff_dtype)
+    edge_dict = collect_edge_data(im, chunk_coord)
+    edge_dict = iu.postprocess_edge_data(im, edge_dict)
     mapping = collect_agglomeration_data(im, chunk_coord)
     active_edge_dict, isolated_ids = define_active_edges(edge_dict, mapping)
 
@@ -317,13 +320,14 @@ def _get_cont_chunk_coords(im, chunk_coord_a, chunk_coord_b):
     return c_chunk_coords
 
 
-def collect_edge_data(im, chunk_coord, aff_dtype=np.float32):
+def collect_edge_data(im, chunk_coord):
     """ Loads edge for single chunk
 
     :param im: IngestionManager
     :param chunk_coord: np.ndarray
         array of three ints
     :param aff_dtype: np.dtype
+    :param v3_data: bool
     :return: dict of np.ndarrays
     """
     subfolder = "chunked_rg"
@@ -387,8 +391,6 @@ def collect_edge_data(im, chunk_coord, aff_dtype=np.float32):
     edge_data = {}
     read_counter = collections.Counter()
 
-    dtype = [("sv1", np.uint64), ("sv2", np.uint64),
-             ("aff", aff_dtype), ("area", np.uint64)]
     for k in filenames:
         # print(k, len(filenames[k]))
 
@@ -406,10 +408,11 @@ def collect_edge_data(im, chunk_coord, aff_dtype=np.float32):
                 continue
 
             if swap[file["filename"]]:
-                this_dtype = [dtype[1], dtype[0], dtype[2], dtype[3]]
+                this_dtype = [im.edge_dtype[1], im.edge_dtype[0]] + \
+                              im.edge_dtype[2:]
                 content = np.frombuffer(file["content"], dtype=this_dtype)
             else:
-                content = np.frombuffer(file["content"], dtype=dtype)
+                content = np.frombuffer(file["content"], dtype=im.edge_dtype)
 
             data.append(content)
 

@@ -79,3 +79,21 @@ def initialize_chunkedgraph(cg_table_id, ws_cv_path, chunk_size, size,
     cg = chunkedgraph.ChunkedGraph(**kwargs)
 
     return cg, n_layers_agg
+
+
+def postprocess_edge_data(im, edge_dict):
+    if im.data_version == 2:
+        return edge_dict
+    elif im.data_version == 3:
+        areas = edge_dict["area_x"] * im.cg.cv.scales[0] + \
+                edge_dict["area_y"] * im.cg.cv.scales[1] + \
+                edge_dict["area_z"] * im.cg.cv.scales[2]
+
+        affs = edge_dict["aff_x"] * im.cg.cv.scales[0] + \
+               edge_dict["aff_y"] * im.cg.cv.scales[1] + \
+               edge_dict["aff_z"] * im.cg.cv.scales[2]
+
+        edge_dict["area"] = areas
+        edge_dict["aff"] = affs
+
+        return edge_dict
