@@ -31,7 +31,7 @@ class IngestionManager(object):
                      ("aff_x", np.float32), ("area_x", np.uint64),
                      ("aff_y", np.float32), ("area_y", np.uint64),
                      ("aff_z", np.float32), ("area_z", np.uint64)]
-        if self.data_version == 3:
+        elif self.data_version == 3:
             dtype = [("sv1", np.uint64), ("sv2", np.uint64),
                      ("aff_x", np.float64), ("area_x", np.uint64),
                      ("aff_y", np.float64), ("area_y", np.uint64),

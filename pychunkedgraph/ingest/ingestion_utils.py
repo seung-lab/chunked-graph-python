@@ -85,7 +85,7 @@ def initialize_chunkedgraph(cg_table_id, ws_cv_path, chunk_size, size,
 def postprocess_edge_data(im, edge_dict):
     if im.data_version == 2:
         return edge_dict
-    elif im.data_version == 3:
+    elif im.data_version in [3, 4]:
         new_edge_dict = {}
         for k in edge_dict:
             areas = edge_dict[k]["area_x"] * im.cg.cv.resolution[0] + \
@@ -103,3 +103,5 @@ def postprocess_edge_data(im, edge_dict):
             new_edge_dict[k]["aff"] = affs
 
         return new_edge_dict
+    else:
+        raise Exception(f"Unknown data_version: {data_version}")
