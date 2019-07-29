@@ -2,6 +2,7 @@ import numpy as np
 from pychunkedgraph.backend import chunkedgraph, chunkedgraph_utils
 
 import cloudvolume
+import collections
 
 
 def calc_n_layers(ws_cv, chunk_size, fan_out):
@@ -85,15 +86,20 @@ def postprocess_edge_data(im, edge_dict):
     if im.data_version == 2:
         return edge_dict
     elif im.data_version == 3:
-        areas = edge_dict["area_x"] * im.cg.cv.scales[0] + \
-                edge_dict["area_y"] * im.cg.cv.scales[1] + \
-                edge_dict["area_z"] * im.cg.cv.scales[2]
+        new_edge_dict = {}
+        for k in edge_dict:
+            areas = edge_dict[k]["area_x"] * im.cg.cv.resolution[0] + \
+                    edge_dict[k]["area_y"] * im.cg.cv.resolution[1] + \
+                    edge_dict[k]["area_z"] * im.cg.cv.resolution[2]
 
-        affs = edge_dict["aff_x"] * im.cg.cv.scales[0] + \
-               edge_dict["aff_y"] * im.cg.cv.scales[1] + \
-               edge_dict["aff_z"] * im.cg.cv.scales[2]
+            affs = edge_dict[k]["aff_x"] * im.cg.cv.resolution[0] + \
+                   edge_dict[k]["aff_y"] * im.cg.cv.resolution[1] + \
+                   edge_dict[k]["aff_z"] * im.cg.cv.resolution[2]
 
-        edge_dict["area"] = areas
-        edge_dict["aff"] = affs
+            new_edge_dict[k] = {}
+            new_edge_dict[k]["sv1"] = edge_dict[k]["sv1"]
+            new_edge_dict[k]["sv2"] = edge_dict[k]["sv2"]
+            new_edge_dict[k]["area"] = areas
+            new_edge_dict[k]["aff"] = affs
 
-        return edge_dict
+        return new_edge_dict

@@ -21,11 +21,16 @@ class IngestionManager(object):
 
     @property
     def data_version(self):
-        assert self._data_version in [2, 3]
+        assert self._data_version in [2, 3, 4]
         return self._data_version
 
     @property
     def edge_dtype(self):
+        if self.data_version == 4:
+            dtype = [("sv1", np.uint64), ("sv2", np.uint64),
+                     ("aff_x", np.float32), ("area_x", np.uint64),
+                     ("aff_y", np.float32), ("area_y", np.uint64),
+                     ("aff_z", np.float32), ("area_z", np.uint64)]
         if self.data_version == 3:
             dtype = [("sv1", np.uint64), ("sv2", np.uint64),
                      ("aff_x", np.float64), ("area_x", np.uint64),
@@ -85,7 +90,8 @@ class IngestionManager(object):
                 "cg_table_id": self._cg_table_id,
                 "n_layers": self.n_layers,
                 "instance_id": self._instance_id,
-                "project_id": self._project_id}
+                "project_id": self._project_id,
+                "data_version": self.data_version}
 
         return info
 
