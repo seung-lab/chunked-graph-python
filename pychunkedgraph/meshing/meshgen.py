@@ -492,7 +492,7 @@ def remeshing(
         chunk_mesh_task_new_remapping(
             cg.get_serialized_info(),
             chunk_id,
-            cg._cv_path,
+            cv_path or cg._cv_path,
             cv_mesh_dir=cv_mesh_dir,
             mip=mip,
             fragment_batch_size=20,
