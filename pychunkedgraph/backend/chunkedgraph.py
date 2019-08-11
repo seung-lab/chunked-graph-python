@@ -2801,20 +2801,56 @@ class ChunkedGraph(object):
                 "split_edges": np.array(split_history)}
 
     def normalize_bounding_box(self,
-                               bounding_box: Optional[Sequence[Sequence[int]]],
-                               bb_is_coordinate: bool) -> \
-            Union[Sequence[Sequence[int]], None]:
+                bounding_box: Optional[Sequence[Sequence[int]]],
+                bb_is_coordinate: bool) -> \
+                Union[Sequence[Sequence[int]], None]:
         if bounding_box is None:
             return None
 
         if bb_is_coordinate:
-            bounding_box = np.array(bounding_box,
-                                    dtype=np.float32) / self.chunk_size
-            bounding_box[0] = np.floor(bounding_box[0])
-            bounding_box[1] = np.ceil(bounding_box[1])
-            return bounding_box.astype(np.int)
+            bounding_box[0] = self.get_chunk_coordinates_from_vol_coordinates(
+            bounding_box[0][0], bounding_box[0][1], bounding_box[0][2],
+            resolution=self.cv.resolution, ceil=False)
+            bounding_box[1] = self.get_chunk_coordinates_from_vol_coordinates(
+            bounding_box[1][0], bounding_box[1][1], bounding_box[1][2],
+            resolution=self.cv.resolution, ceil=True)
+            return bounding_box
         else:
             return np.array(bounding_box, dtype=np.int)
+
+    def get_chunk_coordinates_from_vol_coordinates(self,
+                                                       x: np.int,
+                                                       y: np.int,
+                                                       z: np.int,
+                                                       resolution: Sequence[np.int],
+                                                       ceil: bool = False,
+                                                       layer: int = 1
+                                                       ) -> np.ndarray:
+        """ Translates volume coordinates to chunk_coordinates
+        :param x: np.int
+        :param y: np.int
+        :param z: np.int
+        :param resolution: np.ndarray
+        :param ceil bool
+        :param layer: int
+        :return:
+        """
+        resolution = np.array(resolution)
+        scaling = np.array(self.cv.resolution / resolution, dtype=np.int)
+
+        x = (x / scaling[0] - self.vx_vol_bounds[0, 0]) / self.chunk_size[0]
+        y = (y / scaling[1] - self.vx_vol_bounds[1, 0]) / self.chunk_size[1]
+        z = (z / scaling[2] - self.vx_vol_bounds[2, 0]) / self.chunk_size[2]
+
+        x /= self.fan_out ** (max(layer - 2, 0))
+        y /= self.fan_out ** (max(layer - 2, 0))
+        z /= self.fan_out ** (max(layer - 2, 0))
+
+        coords = np.array([x, y, z])
+        if ceil:
+            coords = np.ceil(coords)
+
+        return coords.astype(np.int)
 
     def _get_subgraph_higher_layer_nodes(
             self, node_id: np.uint64,
