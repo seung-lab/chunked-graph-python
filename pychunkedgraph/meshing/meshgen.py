@@ -835,7 +835,7 @@ def get_higher_to_lower_remapping(cg, chunk_id, time_stamp):
 
     lower_remaps = {}
     if cg.get_chunk_layer(chunk_id) > 2:
-        for lower_chunk_id in cg.get_chunk_child_ids(chunk_id):
+        for lower_chunk_id in cg.get_child_chunk_ids(chunk_id):
             # TODO speedup
             lower_remaps.update(
                 get_higher_to_lower_remapping(cg, lower_chunk_id, time_stamp=time_stamp)

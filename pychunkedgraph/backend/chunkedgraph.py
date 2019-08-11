@@ -379,7 +379,31 @@ class ChunkedGraph(object):
             return np.uint64(layer << layer_offset | x << x_offset |
                              y << y_offset | z << z_offset)
 
+    def get_child_chunk_ids(self, node_or_chunk_id: np.uint64) -> np.ndarray:
+        """ Calculates the ids of the children chunks in the next lower layer
 
+        :param node_or_chunk_id: np.uint64
+        :return: np.ndarray
+        """
+        chunk_coords = self.get_chunk_coordinates(node_or_chunk_id)
+        chunk_layer = self.get_chunk_layer(node_or_chunk_id)
+
+        if chunk_layer == 1:
+            return np.array([])
+        elif chunk_layer == 2:
+            x, y, z = chunk_coords
+            return np.array([self.get_chunk_id(layer=chunk_layer-1,
+                                                x=x, y=y, z=z)])
+        else:
+            chunk_ids = []
+            for dcoord in itertools.product(*[range(self.fan_out)]*3):
+                x, y, z = chunk_coords * self.fan_out + np.array(dcoord)
+                child_chunk_id = self.get_chunk_id(layer=chunk_layer-1,
+                                                    x=x, y=y, z=z)
+                chunk_ids.append(child_chunk_id)
+
+            return np.array(chunk_ids)
+        
     def get_parent_chunk_ids(self, node_or_chunk_id: np.uint64) -> np.ndarray:
         """ Creates list of chunk parent ids
 
