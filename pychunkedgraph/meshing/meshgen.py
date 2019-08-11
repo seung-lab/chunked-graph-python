@@ -22,6 +22,10 @@ UTC = pytz.UTC
 
 sys.path.insert(0, os.path.join(sys.path[0], '../..'))
 os.environ['TRAVIS_BRANCH'] = "IDONTKNOWWHYINEEDTHIS"
+# Change below to true if debugging and want to see results in stdout
+PRINT_FOR_DEBUGGING = True
+# Change below to false if debugging and do not need to write to cloud (warning: do not deploy w/ below set to false)
+WRITING_TO_CLOUD = False
 
 from pychunkedgraph.backend import chunkedgraph   # noqa
 from pychunkedgraph.backend.utils import serializers, column_keys  # noqa
