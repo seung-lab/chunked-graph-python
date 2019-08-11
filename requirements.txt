@@ -1,6 +1,6 @@
 numpy
 pandas
-networkx
+networkx==2.1
 google-cloud-bigtable>=0.33.0
 google-cloud-datastore>=1.8<=2.0dev
 networkx
@@ -13,4 +13,5 @@ python-json-logger
 zstandard
 -e git+https://github.com/seung-lab/igneous.git#egg=igneous
 zmesh
-PyDraco
+dracopy==0.0.11
+fastremap
