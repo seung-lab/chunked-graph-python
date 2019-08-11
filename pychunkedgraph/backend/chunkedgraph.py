@@ -304,7 +304,7 @@ class ChunkedGraph(object):
         :param node_or_chunk_id: np.uint64
         :return: int
         """
-        return int(node_or_chunk_id) >> 64 - self._n_bits_for_layer_id
+        return int(int(node_or_chunk_id) >> 64 - self._n_bits_for_layer_id)
 
     def get_chunk_layers(self, node_or_chunk_ids: Sequence[np.uint64]
                          ) -> np.ndarray:
