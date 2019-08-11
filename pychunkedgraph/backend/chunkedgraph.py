@@ -336,6 +336,7 @@ class ChunkedGraph(object):
         z = int(node_or_chunk_id) >> z_offset & 2 ** bits_per_dim - 1
         return np.array([x, y, z])
 
+        
     def get_chunk_id(self, node_id: Optional[np.uint64] = None,
                      layer: Optional[int] = None,
                      x: Optional[int] = None,
@@ -430,10 +431,11 @@ class ChunkedGraph(object):
         :param node_ids: np.ndarray(dtype=np.uint64)
         :return: np.ndarray(dtype=np.uint64)
         """
-        # TODO: measure and improve performance(?)
-        return np.array(list(map(lambda x: self.get_chunk_id(node_id=x),
-                                 node_ids)), dtype=np.uint64)
+        if len(node_ids) == 0:
+            return np.array([], dtype=np.int)
 
+        return self._get_chunk_id_vec(node_ids)
+    
     def get_segment_id_limit(self, node_or_chunk_id: np.uint64) -> np.uint64:
         """ Get maximum possible Segment ID for given Node ID or Chunk ID
 
