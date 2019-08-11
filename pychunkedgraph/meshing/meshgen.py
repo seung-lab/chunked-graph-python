@@ -14,6 +14,7 @@ import networkx as nx
 from scipy import ndimage, sparse
 import fastremap
 import time
+from typing import Sequence
 import cloudvolume
 from functools import lru_cache
 import datetime
