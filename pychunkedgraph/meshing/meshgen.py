@@ -1067,15 +1067,15 @@ def get_remapped_segmentation(
         [2 ** mip_diff, 2 ** mip_diff, 1]
     )
     mip_chunk_size = mip_chunk_size.astype(np.int)
-
+    
     chunk_start = (
         cg.get_chunk_coordinates(chunk_id) * mip_chunk_size
     )
     chunk_end = chunk_start + mip_chunk_size + overlap_vx
     chunk_end = Vec.clamp(
         chunk_end,
-        0,
-        cg.cv.mip_volume_size(mip),
+        cg.cv.mip_voxel_offset(mip),
+        cg.cv.mip_voxel_offset(mip) + cg.cv.mip_volume_size(mip),
     )
 
     ws_seg = cv[
@@ -1314,13 +1314,13 @@ def get_remapped_seg_for_lvl2_nodes(
     mip_chunk_size = mip_chunk_size.astype(np.int)
 
     chunk_start = (
-       cg.get_chunk_coordinates(chunk_id) * mip_chunk_size
+        cg.get_chunk_coordinates(chunk_id) * mip_chunk_size
     )
     chunk_end = chunk_start + mip_chunk_size + overlap_vx
     chunk_end = Vec.clamp(
         chunk_end,
-        (0,0,0),
-        cg.cv.mip_volume_size(mip),
+        cg.cv.mip_voxel_offset(mip),
+        cg.cv.mip_voxel_offset(mip) + cg.cv.mip_volume_size(mip),
     )
 
     seg = cv[
