@@ -1563,9 +1563,9 @@ def chunk_mesh_task_new_remapping(
             ]
             node_id = multi_child_node_ids[i]
             multi_child_nodes[
-                f"{node_id}:0:{meshgen_utils.get_chunk_bbox_str(cg, node_id)}"
+                f"{node_id}:0:{meshgen_utils.get_chunk_bbox_str(cg, node_id, mip)}"
             ] = [
-                f"{c}:0:{meshgen_utils.get_chunk_bbox_str(cg, c)}"
+                f"{c}:0:{meshgen_utils.get_chunk_bbox_str(cg, c, mip)}"
                 for c in descendents_for_current_node
             ]
             start_index = end_index
