@@ -183,7 +183,7 @@ class ChunkedGraph(object):
 
     @property
     def n_layers(self) -> np.uint64:
-        return self._n_layers
+        return int(self._n_layers)
 
     @property
     def bitmasks(self) -> Dict[int, int]:

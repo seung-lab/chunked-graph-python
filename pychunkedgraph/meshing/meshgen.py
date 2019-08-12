@@ -1503,7 +1503,7 @@ def chunk_mesh_task_new_remapping(
                     compress = True
                 if WRITING_TO_CLOUD:
                     storage.put_file(
-                        file_path=f"{mesh_dir}/{meshgen_utils.get_mesh_name(cg, obj_id)}",
+                        file_path=f"{mesh_dir}/{meshgen_utils.get_mesh_name(cg, obj_id, mip)}",
                         content=file_contents,
                         compress=compress,
                         cache_control="no-cache",
