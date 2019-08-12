@@ -2908,7 +2908,12 @@ class ChunkedGraph(object):
                 children = children[bound_check_mask]
 
             return children
-        
+
+        if bounding_box is not None:
+            bounding_box = np.array(bounding_box)
+
+        layer = self.get_chunk_layer(node_id)
+        assert layer > 1
 
         nodes_per_layer = {}
         child_ids = np.array([node_id], dtype=np.uint64)
@@ -2922,14 +2927,19 @@ class ChunkedGraph(object):
 
         while layer > stop_layer:
             # Use heuristic to guess the optimal number of threads
+            child_id_layers = self.get_chunk_layers(child_ids)
+            this_layer_m = child_id_layers == layer
+            this_layer_child_ids = child_ids[this_layer_m]
+            next_layer_child_ids = child_ids[~this_layer_m]
+
             n_child_ids = len(child_ids)
             this_n_threads = np.min([int(n_child_ids // 50000) + 1, mu.n_cpus])
 
             child_ids = np.fromiter(chain.from_iterable(mu.multithread_func(
                 _get_subgraph_higher_layer_nodes_threaded,
-                np.array_split(child_ids, this_n_threads),
+                 np.array_split(this_layer_child_ids, this_n_threads),
                 n_threads=this_n_threads, debug=this_n_threads == 1)), np.uint64)
-
+            child_ids = np.concatenate([child_ids, next_layer_child_ids])
             if verbose:
                 self.logger.debug("Layer %d: %.3fms for %d children with %d threads" %
                                   (layer, (time.time() - time_start) * 1000, n_child_ids,

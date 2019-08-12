@@ -1308,7 +1308,7 @@ def get_remapped_seg_for_lvl2_nodes(
     # Determine the segmentation bounding box to download given cg, chunk_id, and mip. Then download
     cv = cloudvolume.CloudVolume(cg.cv.cloudpath, mip=mip)
     mip_diff = mip - cg.cv.mip
-
+    print('mip_diff', mip_diff)
     mip_chunk_size = cg.chunk_size.astype(np.int) / np.array(
         [2 ** mip_diff, 2 ** mip_diff, 1]
     )
