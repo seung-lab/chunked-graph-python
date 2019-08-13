@@ -24,7 +24,7 @@ UTC = pytz.UTC
 sys.path.insert(0, os.path.join(sys.path[0], '../..'))
 os.environ['TRAVIS_BRANCH'] = "IDONTKNOWWHYINEEDTHIS"
 # Change below to true if debugging and want to see results in stdout
-PRINT_FOR_DEBUGGING = True
+PRINT_FOR_DEBUGGING = False
 # Change below to false if debugging and do not need to write to cloud (warning: do not deploy w/ below set to false)
 WRITING_TO_CLOUD = True
 
@@ -457,6 +457,13 @@ def run_task_bundle(settings, layer, roi):
                 except EmptyVolumeException as e:
                     print("Warning: Empty segmentation encountered: %s" % e)
 
+def mesh_segid_thread(margs):
+    cg_info, cv_path, cv_mesh_dir, seg_id, stop_layer, mip = margs
+    cg = chunkedgraph.ChunkedGraph(**cg_info)
+    lvl2_ids = cg.get_subgraph_nodes(seg_id, return_layers=[2])
+    remeshing(cg,  lvl2_ids, stop_layer=stop_layer, cv_path=cv_path, cv_mesh_dir=cv_mesh_dir, mip=mip)
+
+                        
 def remeshing(
     cg,
     l2_node_ids: Sequence[np.uint64],
@@ -487,6 +494,7 @@ def remeshing(
 
     add_nodes_to_l2_chunk_dict(l2_node_ids)
     for chunk_id, node_ids in l2_chunk_dict.items():
+        
         if(PRINT_FOR_DEBUGGING):
             print("remeshing", chunk_id, node_ids)
         # Remesh the l2_node_ids
@@ -524,7 +532,7 @@ def remeshing(
             chunk_mesh_task_new_remapping(
                 cg.get_serialized_info(),
                 chunk_id,
-                cg._cv_path,
+                cv_path or cg._cv_path,
                 cv_mesh_dir=cv_mesh_dir,
                 mip=mip,
                 fragment_batch_size=20,
