@@ -544,7 +544,7 @@ def get_root_lx_remapping(cg, chunk_id, stop_layer, time_stamp, n_threads=1):
     def _get_root_ids(args):
         start_id, end_id = args
         root_ids[start_id:end_id] = cg.get_roots(
-            lx_ids[start_id:end_id], stop_layer=stop_layer
+            lx_ids[start_id:end_id], time_stamp=time_stamp, stop_layer=stop_layer
         )
 
     lx_id_remap = get_higher_to_lower_remapping(cg, chunk_id, time_stamp=time_stamp)
@@ -1315,11 +1315,11 @@ def chunk_mesh_task_new_remapping(
         )
         if node_id_subset is None:
             range_read = cg.range_read_chunk(
-                layer, cx, cy, cz, columns=column_keys.Hierarchy.Child
+                layer, cx, cy, cz, columns=column_keys.Hierarchy.Child, time_stamp=time_stamp
             )
         else:
             range_read = cg.read_node_id_rows(
-                node_ids=node_id_subset, columns=column_keys.Hierarchy.Child
+                node_ids=node_id_subset, columns=column_keys.Hierarchy.Child, end_time=time_stamp
             )
 
         print("Collecting only nodes with more than one child: ", end="")

@@ -14,7 +14,7 @@ ingest_cli = AppGroup('mesh')
 
 num_messages = 0
 messages = []
-cg = ChunkedGraph('fly_v31')
+cg = ChunkedGraph('fly_v26')
 def handlerino_write_to_cloud(*args, **kwargs):
     global num_messages
     num_messages = num_messages + 1
@@ -82,7 +82,7 @@ def mesh_chunks(layer, x_start, y_start, z_start, x_end, y_end, z_end, fragment_
     chunk_pubsub.subscribe(**{'mesh_frag_test_channel': handlerino_print})
     thread = chunk_pubsub.run_in_thread(sleep_time=0.1)
 
-    cg = ChunkedGraph('fly_v31')
+    cg = ChunkedGraph('fly_v26')
     for x in range(x_start,x_end):
         for y in range(y_start, y_end):
             for z in range(z_start, z_end):
@@ -121,7 +121,7 @@ def mesh_chunks_shuffled(layer, x_start, y_start, z_start, x_end, y_end, z_end, 
     chunk_pubsub = current_app.redis.pubsub()
     chunk_pubsub.subscribe(**{'mesh_frag_test_channel': handlerino_periodically_write_to_cloud})
 
-    cg = ChunkedGraph('fly_v31')
+    cg = ChunkedGraph('fly_v26')
     chunks_arr = []
     for x in range(x_start,x_end):
         for y in range(y_start, y_end):
@@ -164,7 +164,7 @@ def mesh_chunks_from_file(filename):
     chunk_pubsub = current_app.redis.pubsub()
     chunk_pubsub.subscribe(**{'mesh_frag_test_channel': handlerino_periodically_write_to_cloud})
     thread = chunk_pubsub.run_in_thread(sleep_time=0.1)
-    cg = ChunkedGraph('fly_v31')
+    cg = ChunkedGraph('fly_v26')
     chunk_ids = []
     with open(filename, 'r') as f:
         line = f.readline()
@@ -205,7 +205,7 @@ def mesh_chunks_exclude_file(layer, x_start, y_start, z_start, x_end, y_end, z_e
     print(f'Queueing...')
     chunk_pubsub = current_app.redis.pubsub()
     chunk_pubsub.subscribe(**{'mesh_frag_test_channel': handlerino_periodically_write_to_cloud})
-    cg = ChunkedGraph('fly_v31')
+    cg = ChunkedGraph('fly_v26')
     chunk_ids = []
     with open(filename, 'r') as f:
         line = f.readline()
@@ -257,7 +257,7 @@ def mesh_chunk_ids_shuffled(chunk_ids_string):
     chunk_pubsub.subscribe(**{'mesh_frag_test_channel': handlerino_periodically_write_to_cloud})
     thread = chunk_pubsub.run_in_thread(sleep_time=0.1)
 
-    cg = ChunkedGraph('fly_v31')
+    cg = ChunkedGraph('fly_v26')
     
     chunk_ids = np.uint64(chunk_ids_string.split(','))
     np.random.shuffle(chunk_ids)
@@ -290,7 +290,7 @@ def mesh_frag_test(n, layer):
     chunk_pubsub.subscribe(**{'mesh_frag_test_channel': handlerino_write_to_cloud})
     thread = chunk_pubsub.run_in_thread(sleep_time=0.1)
 
-    cg = ChunkedGraph('fly_v31')
+    cg = ChunkedGraph('fly_v26')
     new_info = cg.cv.info
 
     dataset_size = np.array(new_info['scales'][0]['size'])
