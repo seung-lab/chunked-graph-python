@@ -211,9 +211,9 @@ def merge_meshes(meshes):
 
 
 def mesh_segid_thread(margs):
-    cg_info, cv_path, cv_mesh_dir, seg_id, stop_layer, mip = margs
+    cg_info, cv_path, cv_mesh_dir, lvl2_ids, stop_layer, mip = margs
     cg = chunkedgraph.ChunkedGraph(**cg_info)
-    lvl2_ids = cg.get_subgraph_nodes(seg_id, return_layers=[2])
+    # lvl2_ids = cg.get_subgraph_nodes(seg_id, return_layers=[2])
     remeshing(cg,  lvl2_ids, stop_layer=stop_layer, cv_path=cv_path, cv_mesh_dir=cv_mesh_dir, mip=mip)
 
                         
@@ -910,11 +910,14 @@ def get_root_remapping_for_nodes_and_svs(
         start_id, end_id = args
 
         root_ids[start_id:end_id] = cg.get_roots(
-            combined_ids[start_id:end_id], stop_layer=stop_layer, time_stamp=time_stamp
+            combined_ids[start_id:end_id],
+            stop_layer=stop_layer,
+            time_stamp=time_stamp
         )
 
     rr = cg.range_read_chunk(
-        chunk_id=chunk_id, columns=column_keys.Hierarchy.Parent, time_stamp=time_stamp
+        chunk_id=chunk_id, columns=column_keys.Hierarchy.Parent,
+        time_stamp=time_stamp
     )
     upper_lvl_ids = [id[0].value for id in rr.values()]
     combined_ids = np.concatenate((node_ids, sv_ids, upper_lvl_ids))
@@ -933,8 +936,8 @@ def get_root_remapping_for_nodes_and_svs(
     chunk_ids_index = len(node_ids) + len(sv_ids)
 
     return (
-        root_ids[0:sv_ids_index],
-        root_ids[sv_ids_index:chunk_ids_index],
+        root_ids[:sv_ids_index],
+        root_ids[sv_ids_index: chunk_ids_index],
         root_ids[chunk_ids_index:],
     )
 
@@ -999,9 +1002,10 @@ def get_lx_overlapping_remappings_for_nodes_and_svs(
     # Find the parent in the lowest common chunk for each node id and sv id. These parent
     # ids are referred to as root ids even though they are not necessarily the
     # root id.
-    node_root_ids, sv_root_ids, chunks_root_ids = get_root_remapping_for_nodes_and_svs(
-        cg, chunk_id, node_ids, sv_ids, stop_layer, time_stamp, n_threads
-    )
+    node_root_ids, sv_root_ids, chunks_root_ids = \
+        get_root_remapping_for_nodes_and_svs(cg, chunk_id, node_ids,
+                                             sv_ids, stop_layer, time_stamp,
+                                             n_threads)
 
     u_root_ids, c_root_ids = np.unique(chunks_root_ids, return_counts=True)
 
@@ -1010,8 +1014,9 @@ def get_lx_overlapping_remappings_for_nodes_and_svs(
     # overlap) for these. All other ones have to be resolved using the
     # segmentation.
 
-    temp_node_roots = u_root_ids[np.where(u_root_ids == node_root_ids)]
-    node_root_counts = c_root_ids[np.where(u_root_ids == node_root_ids)]
+    m_in = np.in1d(u_root_ids, node_root_ids)
+    temp_node_roots = u_root_ids[m_in]
+    node_root_counts = c_root_ids[m_in]
     unsafe_root_ids = temp_node_roots[np.where(node_root_counts > 1)]
     safe_node_ids = node_ids[~np.isin(node_root_ids, unsafe_root_ids)]
 
