@@ -9,11 +9,11 @@ import multiwrapper.multiprocessing_utils as mu
 from analysisdatalink.datalink_ext import AnalysisDataLinkExt as AnalysisDataLink
 
 dataset_name = 'pinky100'
-mat_version = 175
+mat_version = 176
 HOME = os.path.expanduser("~")
 orig_cv_path = 'https://storage.googleapis.com/neuroglancer/nkem/pinky100_v0/ws/lost_no-random/bbox1_0'
-cv_path = f'file://{HOME}/friday_harbor_v2/friday_harbor_pinky100_sv16/'
-cv_mesh_dir = "friday_harbor_meshes"
+cv_path = f'file://{HOME}/pinky100_remeshed/pinky100_sv16/'
+cv_mesh_dir = f"mat_v{mat_version}"
 cg = ChunkedGraph("pinky100_sv16")
 stop_layer=2
 mip = 2
@@ -27,7 +27,7 @@ soma_df = dl.query_cell_types('soma_valence_v2',  cell_type_include_filter=['e',
 # make a proper cloud volume at this path
 orig_cv = cloudvolume.CloudVolume(orig_cv_path)
 info = orig_cv.info
-info['mesh']=cv_mesh_dir
+info['mesh'] = cv_mesh_dir
 new_cv = cloudvolume.CloudVolume(cv_path, info=info)
 new_cv.commit_info()
 
