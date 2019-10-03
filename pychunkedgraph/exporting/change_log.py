@@ -87,7 +87,7 @@ def lookup_sv_coords(cg, sv_ids):
     return sv_coords
 
 
-def process_single_changelog_entry(cg, cl_entry):
+def process_single_changelog_entry(cg, cl_entry, recalc_coords=True):
     # Determine whether an edit is split or merge
     is_split = column_keys.OperationLogs.RemovedEdge in cl_entry
 
@@ -96,22 +96,34 @@ def process_single_changelog_entry(cg, cl_entry):
     source_ids = cl_entry[column_keys.OperationLogs.SourceID][0].value
 
     # Extract coordinates from supervoxels
-    sv_coords = lookup_sv_coords(cg, np.concatenate([sink_ids, source_ids]))
-    sink_coords = sv_coords[:len(sink_ids)]
-    source_coords = sv_coords[len(sink_ids):]
+    if recalc_coords:
+        sv_coords = lookup_sv_coords(cg, np.concatenate([sink_ids, source_ids]))
+        sink_coords = sv_coords[:len(sink_ids)]
+        source_coords = sv_coords[len(sink_ids):]
+    else:
+        sink_coords = np.frombuffer(cl_entry[column_keys.OperationLogs.SinkCoordinate][0].value).reshape(-1, 3) * cg.segmentation_resolution
+        sink_coords = sink_coords.astype(np.int)
+        source_coords = np.frombuffer(cl_entry[column_keys.OperationLogs.SourceCoordinate][0].value).reshape(-1, 3) * cg.segmentation_resolution
+        source_coords = source_coords.astype(np.int)
 
     # User id
     user_id = cl_entry[column_keys.OperationLogs.UserID][0].value
 
+    # Time stamp
+    time_stamp = cl_entry[column_keys.OperationLogs.UserID][0].timestamp
+
     cl_entry_p = {"is_split": is_split,
                   "sink_coords": sink_coords,
                   "source_coords": source_coords,
+                  "sink_sv_ids": sink_ids,
+                  "source_sv_ids": source_ids,
+                  "timestamp": time_stamp,
                   "user_id": "default"}
     return cl_entry_p
 
 
 def _process_changelog_entries(args):
-    cg_info, cl_keys, cl_path = args
+    cg_info, cl_keys, cl_path, recalc_coords = args
 
     cl = load_changelog(cl_path)
     cl_p = {}
@@ -120,26 +132,31 @@ def _process_changelog_entries(args):
     times = []
     for cl_key in cl_keys:
         time_start = time.time()
-        cl_p[cl_key] = process_single_changelog_entry(cg, cl[cl_key])
+        cl_p[cl_key] = process_single_changelog_entry(cg, cl[cl_key],
+                                                      recalc_coords=recalc_coords)
         times.append(time.time() - time_start)
 
-    print(np.mean(times), times)
+    print(np.mean(times), np.std(times))
 
     return cl_p
 
 
-def reformat_changelog(cg, cl_path, out_path=None, n_threads=10, n_limit=100):
+def reformat_changelog(cg, cl_path, out_path=None, n_threads=10, n_limit=None,
+                       recalc_coords=True):
     cl = load_changelog(cl_path)
 
     cg_info = cg.get_serialized_info()
     del cg_info["credentials"]
 
-    cl_keys = list(cl.keys())[:n_limit]
+    cl_keys = list(cl.keys())
+    if n_limit is not None:
+        cl_keys = cl_keys[:n_limit]
+
     cl_key_blocks = np.array_split(cl_keys, n_threads * 3)
 
     multi_args = []
     for cl_key_block in cl_key_blocks:
-        multi_args.append([cg_info, cl_key_block, cl_path])
+        multi_args.append([cg_info, cl_key_block, cl_path, recalc_coords])
 
     results = mu.multisubprocess_func(_process_changelog_entries, multi_args,
                                       n_threads=n_threads)
