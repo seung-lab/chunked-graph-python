@@ -609,19 +609,24 @@ class ChunkedGraph(object):
         min_segment_id = max_segment_id + np.uint64(1) - step
         return min_segment_id, max_segment_id
 
-    def get_unique_segment_id_root_row(
-        self, step: int = 1, counter_id: int = None
+    def _get_n_counters(self, layer):
+        if layer == self.n_layers:
+            return np.uint64(2 ** self._n_bits_root_counter)
+        else:
+            return np.uint64(2 ** max(0, layer - 2))
+
+    def get_unique_segment_id_range(
+        self, chunk_id: np.uint64, step: int = 1, counter_id: int = None
     ) -> np.ndarray:
         """ Return unique Segment ID for the Root Chunk
         atomic counter
+        :param chunk_id: np.uint64
         :param step: int
         :param counter_id: np.uint64
         :return: np.uint64
         """
-        if self.n_bits_root_counter == 0:
-            return self.get_unique_segment_id_range(self.root_chunk_id, step=step)
+        n_counters = self._get_n_counters(self.get_chunk_layer(chunk_id))
 
-        n_counters = np.uint64(2 ** self._n_bits_root_counter)
         if counter_id is None:
             counter_id = np.uint64(np.random.randint(0, n_counters))
         else:
@@ -639,30 +644,6 @@ class ChunkedGraph(object):
             max_segment_id * n_counters + np.uint64(1) + counter_id,
             n_counters,
             dtype=basetypes.SEGMENT_ID,
-        )
-        return segment_id_range
-
-    def get_unique_segment_id_range(
-        self, chunk_id: np.uint64, step: int = 1
-    ) -> np.ndarray:
-        """ Return unique Segment ID for given Chunk ID
-        atomic counter
-        :param chunk_id: np.uint64
-        :param step: int
-        :return: np.uint64
-        """
-        if (
-            self.n_layers == self.get_chunk_layer(chunk_id)
-            and self.n_bits_root_counter > 0
-        ):
-            return self.get_unique_segment_id_root_row(step=step)
-
-        row_key = serializers.serialize_key("i%s" % serializers.pad_node_id(chunk_id))
-        min_segment_id, max_segment_id = self._get_unique_range(
-            row_key=row_key, step=step
-        )
-        segment_id_range = np.arange(
-            min_segment_id, max_segment_id + np.uint64(1), dtype=basetypes.SEGMENT_ID
         )
         return segment_id_range
 
