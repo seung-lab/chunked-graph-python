@@ -677,17 +677,20 @@ class ChunkedGraph(object):
         """
         return self.get_unique_node_id_range(chunk_id=chunk_id, step=1)[0]
 
-    def get_max_seg_id_root_chunk(self) -> np.uint64:
+    def get_max_seg_id(self, chunk_id=None, layer=None) -> np.uint64:
         """  Gets maximal root id based on the atomic counter
         This is an approximation. It is not guaranteed that all ids smaller or
         equal to this id exists. However, it is guaranteed that no larger id
         exist at the time this function is executed.
         :return: uint64
         """
-        if self.n_bits_root_counter == 0:
-            return self.get_max_seg_id(self.root_chunk_id)
+        assert chunk_id is not None or layer is not None
 
-        n_counters = np.uint64(2 ** self.n_bits_root_counter)
+        if layer is None:
+            layer = self.get_chunk_layer(chunk_id)
+
+        n_counters = self._get_n_counters(layer)
+
         max_value = 0
         for counter_id in range(n_counters):
             row_key = serializers.serialize_key(
@@ -698,26 +701,6 @@ class ChunkedGraph(object):
             if counter > max_value:
                 max_value = counter
         return max_value
-
-    def get_max_seg_id(self, chunk_id: np.uint64) -> np.uint64:
-        """  Gets maximal seg id in a chunk based on the atomic counter
-        This is an approximation. It is not guaranteed that all ids smaller or
-        equal to this id exists. However, it is guaranteed that no larger id
-        exist at the time this function is executed.
-        :return: uint64
-        """
-        if (
-            self.n_layers == self.get_chunk_layer(chunk_id)
-            and self.n_bits_root_counter > 0
-        ):
-            return self.get_max_seg_id_root_chunk()
-
-        # Incrementer row keys start with an "i"
-        row_key = serializers.serialize_key("i%s" % serializers.pad_node_id(chunk_id))
-        row = self.read_byte_row(row_key, columns=column_keys.Concurrency.CounterID)
-
-        # Read incrementer value (default to 0) and interpret is as Segment ID
-        return basetypes.SEGMENT_ID.type(row[0].value if row else 0)
 
     def get_max_node_id(self, chunk_id: np.uint64) -> np.uint64:
         """  Gets maximal node id in a chunk based on the atomic counter
