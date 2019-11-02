@@ -1340,6 +1340,21 @@ class ChunkedGraph(object):
         row_dict = self.read_node_id_row(operation_id, columns=columns)
         return row_dict
 
+    def read_log_rows(self, operation_ids: Sequence[np.uint64]):
+        """ Reads a log row (both split and merge)
+
+        :param operation_id: np.uint64
+        :return: dict
+        """
+        columns = [column_keys.OperationLogs.UserID, column_keys.OperationLogs.RootID,
+                   column_keys.OperationLogs.SinkID, column_keys.OperationLogs.SourceID,
+                   column_keys.OperationLogs.SourceCoordinate,
+                   column_keys.OperationLogs.SinkCoordinate, column_keys.OperationLogs.AddedEdge,
+                   column_keys.OperationLogs.Affinity, column_keys.OperationLogs.RemovedEdge,
+                   column_keys.OperationLogs.BoundingBoxOffset]
+        row_dict = self.read_node_id_rows(node_ids=operation_ids, columns=columns)
+        return row_dict
+
     def add_atomic_edges_in_chunks(self, edge_id_dict: dict,
                                    edge_aff_dict: dict, edge_area_dict: dict,
                                    isolated_node_ids: Sequence[np.uint64],
@@ -2741,6 +2756,12 @@ class ChunkedGraph(object):
                     lock_col = column_keys.Concurrency.Lock
                     former_row = self.read_node_id_row(ids[0],
                                                        columns=[lock_col])
+
+                    if not lock_col in former_row:
+                        self.logger.warning("Lock entry broken; cannot read "
+                                            "operation log")
+                        continue
+
                     operation_id = former_row[lock_col][0].value
                     log_row = self.read_log_row(operation_id)
                     is_merge = column_keys.OperationLogs.AddedEdge in log_row
