@@ -3774,15 +3774,25 @@ class ChunkedGraph(object):
             offset = self.vx_vol_bounds[:,0]
         return np.array((offset + self.chunk_size * chunk_coordinate), dtype=np.int)
 
-    def download_chunk_segmentation(self, chunk_coordinate):
+    def download_chunk_segmentation(self, chunk_coordinate, mip=0, cv=None):
         """
         Given a lvl1 or lvl2 chunk coordinate, return the underlying watershed segmentation.
         """
         chunk_start = self.get_chunk_voxel_location(chunk_coordinate)
         chunk_end = self.get_chunk_voxel_location(chunk_coordinate + 1)
-        ws_seg = self.cv[
+        if cv is None:
+            cv = self.cv
+        for _ in range(mip):
+            chunk_start[0] = chunk_start[0] // 2
+            chunk_start[1] = chunk_start[1] // 2
+            chunk_end[0] = chunk_end[0] // 2
+            chunk_end[1] = chunk_end[1] // 2
+        ws_seg = cv[
             chunk_start[0] : chunk_end[0],
             chunk_start[1] : chunk_end[1],
             chunk_start[2] : chunk_end[2],
         ].squeeze()
         return ws_seg
+
+    def get_resolution_from_mip(self, mip):
+        return np.array(cg.cv.scales[mip].resolution)

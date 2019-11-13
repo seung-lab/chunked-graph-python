@@ -608,6 +608,7 @@ def handle_pairwise_contact_sites(table_id, first_node_id, second_node_id):
             )
         )
     exact_location = request.args.get("exact_location", True, type=app_utils.toboolean)
+    closest_to_isotropic = request.args.get("closest_to_isotropic", False, type=app_utils.toboolean)
     cg = app_utils.get_cg(table_id)
     contact_sites_list = contact_sites.get_contact_sites_pairwise(
         cg,
@@ -615,6 +616,7 @@ def handle_pairwise_contact_sites(table_id, first_node_id, second_node_id):
         np.uint64(second_node_id),
         end_time=timestamp,
         exact_location=exact_location,
+        closest_to_isotropic_resolution=closest_to_isotropic
     )
     return contact_sites_list
 

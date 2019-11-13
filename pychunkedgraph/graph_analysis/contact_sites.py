@@ -2,11 +2,13 @@ import collections
 from enum import auto, Enum
 import itertools
 
+import cloudvolume
 from contact_points import find_contact_points
 import numpy as np
 
 from pychunkedgraph.backend import flatgraph_utils
-from pychunkedgraph.backend.utils import column_keys
+from pychunkedgraph.backend.utils import basetypes, column_keys
+
 
 def _get_edges_for_contact_site_graph(
     cg, root_id, bounding_box, bb_is_coordinate, end_time
@@ -65,6 +67,7 @@ def _get_edges_for_contact_site_graph(
     )
     return contact_sites_graph_edges, contact_sites_svs_area_dict, True
 
+
 def get_contact_sites(
     cg,
     root_id,
@@ -74,7 +77,7 @@ def get_contact_sites(
     end_time=None,
     voxel_location=False,
     areas_only=False,
-    as_list=False
+    as_list=False,
 ):
     """
     Given a root id, return a dictionary containing all the contact sites with other roots in the dataset.
@@ -88,7 +91,11 @@ def get_contact_sites(
     If compute_partner=False, the keys of the dictionary are unsigned integers counting up from 0. The values are 
     the lists containing one tuple of the kind specified in the above paragraph.
     """
-    contact_sites_graph_edges, contact_sites_svs_area_dict, any_contact_sites = _get_edges_for_contact_site_graph(
+    (
+        contact_sites_graph_edges,
+        contact_sites_svs_area_dict,
+        any_contact_sites,
+    ) = _get_edges_for_contact_site_graph(
         cg, root_id, bounding_box, bb_is_coordinate, end_time
     )
 
@@ -152,15 +159,19 @@ def get_contact_sites(
         contact_site_list = []
         for partner_id in contact_site_dict:
             if compute_partner:
-                contact_site_list.append({
-                    'segment_id': np.uint64(partner_id),
-                    'contact_site_areas': contact_site_dict[partner_id]
-                })
+                contact_site_list.append(
+                    {
+                        "segment_id": np.uint64(partner_id),
+                        "contact_site_areas": contact_site_dict[partner_id],
+                    }
+                )
             else:
-                contact_site_list.append({
-                    'segment_id': partner_id,
-                    'contact_site_areas': contact_site_dict[partner_id]
-                })
+                contact_site_list.append(
+                    {
+                        "segment_id": partner_id,
+                        "contact_site_areas": contact_site_dict[partner_id],
+                    }
+                )
         return contact_site_list
 
     return contact_site_dict
@@ -229,18 +240,21 @@ def find_approximate_middle_point(points, resolution):
     return points[np.argmin(greater_distance)]
 
 
-def _find_points_nm_coordinate(cg, chunk_coordinates, coordinate_within_chunk):
+def _find_points_nm_coordinate(
+    cg, chunk_coordinates, coordinate_within_chunk, resolution_of_chunk
+):
     """
     Given a lvl1/lvl2 chunk coordinate and a position in the chunk, return a global
     coordinate representing that voxel's position in the dataset.
     """
-    points_voxel_coordinate = (
-        cg.get_chunk_voxel_location(chunk_coordinates) + coordinate_within_chunk
+    chunk_nm_coordinate = (
+        cg.get_chunk_voxel_location(chunk_coordinates) * cg.segmentation_resolution
     )
-    return points_voxel_coordinate * cg.segmentation_resolution
+    internal_chunk_nm_coordinate = coordinate_within_chunk * resolution_of_chunk
+    return chunk_nm_coordinate + internal_chunk_nm_coordinate
 
 
-def _get_approximate_middle_contact_point_same_chunk(cg, sv1, sv2, ws_seg):
+def _get_approximate_middle_contact_point_same_chunk(cg, sv1, sv2, ws_seg, mip):
     """
     Given two supervoxels in the same chunk, return a contact point amongst
     their contact points that is approximately in the center of the contact. 
@@ -249,20 +263,19 @@ def _get_approximate_middle_contact_point_same_chunk(cg, sv1, sv2, ws_seg):
     """
     chunk_coordinate = cg.get_chunk_coordinates(sv1)
     contact_points = find_contact_points(ws_seg, sv1, sv2)
+    resolution = np.array(cg.cv.scales[mip]['resolution'])
     if len(contact_points) == 0:
         sv1_locations = np.where(ws_seg == sv1)
-        sv1_points = np.vstack((sv1_locations[0], sv1_locations[1], sv1_locations[2]))
-        middle_point = find_approximate_middle_point(
-            sv1_points, cg.segmentation_resolution
-        )
+        sv1_points = np.vstack((sv1_locations[0], sv1_locations[1], sv1_locations[2])).T
+        middle_point = find_approximate_middle_point(sv1_points, resolution)
     else:
         middle_point = find_approximate_middle_point(
-            contact_points[:, 0, :], cg.segmentation_resolution
+            contact_points[:, 0, :], resolution
         )
-    return _find_points_nm_coordinate(cg, chunk_coordinate, middle_point)
+    return _find_points_nm_coordinate(cg, chunk_coordinate, middle_point, resolution)
 
 
-def _get_approximate_middle_contact_point_across_chunks(cg, sv1, sv2, sv1_chunk_seg):
+def _get_approximate_middle_contact_point_across_chunks(cg, sv1, sv2, sv1_chunk_seg, mip):
     """
     Given two supervoxels in neighboring chunks, return a contact point amongst
     their contact points that is approximately in the center of the contact. 
@@ -287,20 +300,19 @@ def _get_approximate_middle_contact_point_across_chunks(cg, sv1, sv2, sv1_chunk_
         sv2_chunk_plane = sv2_chunk_seg[:, :, sv2_chunk_plane_index]
     chunk_border = np.stack((sv1_chunk_plane, sv2_chunk_plane), axis=crossing_index)
     contact_points = find_contact_points(chunk_border, sv1, sv2)
+    resolution = np.array(cg.cv.scales[mip]['resolution'])
     if len(contact_points) == 0:
         sv1_locations = np.where(chunk_border == sv1)
         sv1_points = np.vstack((sv1_locations[0], sv1_locations[1], sv1_locations[2]))
-        middle_point = find_approximate_middle_point(
-            sv1_points, cg.segmentation_resolution
-        )
+        middle_point = find_approximate_middle_point(sv1_points, resolution)
     else:
         middle_point = find_approximate_middle_point(
-            contact_points[:, 0, :], cg.segmentation_resolution
+            contact_points[:, 0, :], resolution
         )
-    return _find_points_nm_coordinate(cg, chunk_coordinate, middle_point)
+    return _find_points_nm_coordinate(cg, chunk_coordinate, middle_point, resolution)
 
 
-def _get_approximate_middle_sv_point(cg, sv, ws_seg):
+def _get_approximate_middle_sv_point(cg, sv, ws_seg, mip):
     """
     Get a point in a given supervoxel that is approximately
     in its center.
@@ -308,8 +320,11 @@ def _get_approximate_middle_sv_point(cg, sv, ws_seg):
     chunk_coordinate = cg.get_chunk_coordinates(sv)
     sv_locations = np.where(ws_seg == sv)
     sv_points = np.vstack((sv_locations[0], sv_locations[1], sv_locations[2]))
-    middle_point = find_approximate_middle_point(sv_points, cg.segmentation_resolution)
-    return _find_points_nm_coordinate(cg, chunk_coordinate, middle_point)
+    resolution = np.array(cg.cv.scales[mip]['resolution'])
+    middle_point = find_approximate_middle_point(
+        sv_points, resolution
+    )
+    return _find_points_nm_coordinate(cg, chunk_coordinate, middle_point, resolution)
 
 
 class EdgeType(Enum):
@@ -334,8 +349,8 @@ def _choose_contact_site_edge(cg, first_node_unconnected_edges, second_node_sv_i
         chunk_coordinates_second_node = cg.get_chunk_coordinates(edge[1])
         if np.array_equal(chunk_coordinates_first_node, chunk_coordinates_second_node):
             return (edge, EdgeType.SameChunk)
-        distance = abs(
-            np.sum(chunk_coordinates_first_node) - np.sum(chunk_coordinates_second_node)
+        distance = np.sum(
+            np.abs(chunk_coordinates_first_node - chunk_coordinates_second_node)
         )
         if best_edge is None or distance < smallest_distance:
             smallest_distance = distance
@@ -529,7 +544,7 @@ def _get_sv_contact_site_candidates(cg, first_node_id, second_node_id):
     return (sv_ids_set1, sv_ids_set2)
 
 
-def _get_exact_contact_sites(cg, edges_to_inspect):
+def _get_exact_contact_sites(cg, edges_to_inspect, mip):
     """
     Given a list of edges between two supervoxels, for each edge get a global
     coordinate in the dataset where the two supervoxels contact.
@@ -548,6 +563,7 @@ def _get_exact_contact_sites(cg, edges_to_inspect):
     memoized_chunk = None
     last_chunk_coordinate = None
     contact_sites = []
+    temp_cv = cloudvolume.CloudVolume(cg._cv_path, mip=mip, info=cg.dataset_info)
     for index in sorted_chunk_coordinates_indices:
         edge, edgeType, area = edges_to_inspect[index]
         cur_chunk_coordinate = chunk_coordinate_array[index]
@@ -563,19 +579,21 @@ def _get_exact_contact_sites(cg, edges_to_inspect):
                         cur_chunk_coordinate[1],
                         cur_chunk_coordinate[2],
                     )
-                )
+                ),
+                mip,
+                temp_cv,
             )
         if edgeType == EdgeType.SameChunk:
             contact_point = _get_approximate_middle_contact_point_same_chunk(
-                cg, edge[0], edge[1], memoized_chunk
+                cg, edge[0], edge[1], memoized_chunk, mip
             )
         elif edgeType == EdgeType.AdjacentChunks:
             contact_point = _get_approximate_middle_contact_point_across_chunks(
-                cg, edge[0], edge[1], memoized_chunk
+                cg, edge[0], edge[1], memoized_chunk, mip
             )
         else:
             contact_point = _get_approximate_middle_sv_point(
-                cg, edge[0], memoized_chunk
+                cg, edge[0], memoized_chunk, mip
             )
         contact_sites.append((contact_point, area))
     return contact_sites
@@ -588,6 +606,8 @@ def get_contact_sites_pairwise(
     end_time=None,
     exact_location=True,
     optimize_unsafe=False,
+    closest_to_isotropic_resolution=False,
+    mip=0,
 ):
     """
     Given two node ids, find the locations and areas of their contact sites in the dataset.
@@ -595,6 +615,10 @@ def get_contact_sites_pairwise(
     If exact_location=True, this function returns a list of tuples of two elements,
     where the first element in the tuple is a global coordinate in the dataset, and
     the second is an area.
+    Finding the global coordinate of a contact site necessitates downloading segmentation data.
+    If closest_to_isotropic_resolution=True, the mip level of the segmentation data downloaded
+    is chosen such that the resolution is as close to isotropic as possible. Otherwise, the mip
+    level of the data is specified by the mip parameter.
 
     If exact_location=False, this function returns a list of tuples of three elements.
     The first and second elements are the global coordinates that the contact site appears somewhere
@@ -607,15 +631,23 @@ def get_contact_sites_pairwise(
         cg, sv_ids_set1, sv_ids_set2, end_time, optimize_unsafe
     )
     if exact_location:
-        return _get_exact_contact_sites(cg, edges_to_inspect)
+        if closest_to_isotropic_resolution:
+            resolution_ratios = []
+            for scale in cg.cv.scales:
+                resolution = scale["resolution"]
+                resolution_ratios.append(max(resolution) / min(resolution))
+            mip = np.argmin(resolution_ratios)
+        return _get_exact_contact_sites(cg, edges_to_inspect, mip)
     else:
         contact_sites = []
         for edge_to_inspect in edges_to_inspect:
             edge, _, area = edge_to_inspect
             contact_sites.append(
                 (
-                    cg.get_chunk_voxel_location(cg.get_chunk_coordinates(edge[0])) * cg.segmentation_resolution,
-                    cg.get_chunk_voxel_location(cg.get_chunk_coordinates(edge[0]) + 1) * cg.segmentation_resolution,
+                    cg.get_chunk_voxel_location(cg.get_chunk_coordinates(edge[0]))
+                    * cg.segmentation_resolution,
+                    cg.get_chunk_voxel_location(cg.get_chunk_coordinates(edge[0]) + 1)
+                    * cg.segmentation_resolution,
                     area,
                 )
             )
