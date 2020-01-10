@@ -7,10 +7,12 @@ import multiprocessing as mp
 from itertools import product
 from typing import List
 from typing import Sequence
+from typing import Optional
 from typing import Dict
 from typing import Tuple
 
 import numpy as np
+import datetime
 from multiwrapper import multiprocessing_utils as mu
 
 from .manager import IngestionManager
@@ -27,7 +29,8 @@ from ..backend.chunks.hierarchy import get_children_coords
 chunk_id_str = lambda layer, coords: f"{layer}_{'_'.join(map(str, coords))}"
 
 
-def start_ingest(imanager: IngestionManager):
+def start_ingest(imanager: IngestionManager,
+                 time_stamp: Optional[datetime.datetime] = None):
     atomic_chunk_bounds = imanager.chunkedgraph_meta.layer_chunk_bounds[2]
     chunk_coords = list(product(*[range(r) for r in atomic_chunk_bounds]))
     np.random.shuffle(chunk_coords)
@@ -38,7 +41,8 @@ def start_ingest(imanager: IngestionManager):
         multi_args = []
         for job in jobs:
             multi_args.append(
-                (parent_children_count_d_shared, imanager.get_serialized_info(), job)
+                (parent_children_count_d_shared, imanager.get_serialized_info(),
+                 job, time_stamp)
             )
         mu.multiprocess_func(
             _create_atomic_chunks_helper,
@@ -49,15 +53,17 @@ def start_ingest(imanager: IngestionManager):
 
 def _create_atomic_chunks_helper(args):
     """ helper to start atomic tasks """
-    parent_children_count_d_shared, im_info, chunk_coords = args
+    parent_children_count_d_shared, im_info, chunk_coords, time_stamp = args
     imanager = IngestionManager(**im_info)
     for chunk_coord in chunk_coords:
         chunk_coord = np.array(list(chunk_coord), dtype=np.int)
         chunk_edges_all, mapping = _get_atomic_chunk_data(imanager, chunk_coord)
 
         ids, affs, areas, isolated = get_chunk_data_old_format(chunk_edges_all, mapping)
-        imanager.cg.add_atomic_edges_in_chunks(ids, affs, areas, isolated)
-        _post_task_completion(parent_children_count_d_shared, imanager, 2, chunk_coord)
+        imanager.cg.add_atomic_edges_in_chunks(ids, affs, areas, isolated,
+                                               time_stamp=time_stamp)
+        _post_task_completion(parent_children_count_d_shared, imanager, 2,
+                              chunk_coord, time_stamp=time_stamp)
 
 
 def _get_atomic_chunk_data(imanager: IngestionManager, coord) -> Tuple[Dict, Dict]:
@@ -85,6 +91,7 @@ def _post_task_completion(
     imanager: IngestionManager,
     layer: int,
     coords: np.ndarray,
+    time_stamp: Optional[datetime.datetime] = None
 ):
     parent_layer = layer + 1
     if parent_layer > imanager.chunkedgraph_meta.layer_count:
@@ -109,7 +116,7 @@ def _post_task_completion(
         children = get_children_coords(
             imanager.chunkedgraph_meta, parent_layer, parent_coords
         )
-        imanager.cg.add_layer(parent_layer, children)
+        imanager.cg.add_layer(parent_layer, children, time_stamp=time_stamp)
         del parent_children_count_d_shared[parent_chunk_str]
         _post_task_completion(
             parent_children_count_d_shared, imanager, parent_layer, parent_coords
