@@ -9,7 +9,7 @@ def apply_changelog(cg, cl_path):
 
     for cl_key in cl_keys:
         cl_entry = cl[cl_key]
-        cl_time_stamps.append(cl_entry["time_stamp"])
+        cl_time_stamps.append(cl_entry["timestamp"])
 
     cl_time_stamp_sorting = np.argsort(cl_time_stamps)
 
@@ -34,9 +34,9 @@ def apply_change(cg, cl_entry):
 
 
 def apply_split(cg, cl_entry):
-    pass
+    print("split")
 
 
 def apply_merge(cg, cl_entry):
-    pass
+    print("merge")
 
