@@ -28,8 +28,9 @@ def _process_blocks(args):
     serialized_cg_info, cv_out_path, block_coordinates, timestamp, block_size, mip = args
 
     cg = chunkedgraph.ChunkedGraph(**serialized_cg_info)
-    cv_in = cloudvolume.CloudVolume(cg._cv_path, mip=mip)
-    cv_out = cloudvolume.CloudVolume(cv_out_path, mip=mip)
+    cv_in = cloudvolume.CloudVolume(cg._cv_path, mip=mip, bounded=False)
+    cv_out = cloudvolume.CloudVolume(cv_out_path, mip=mip, bounded=False,
+                                     non_aligned_writes=True)
 
     for block_coordinate in block_coordinates:
         bbox = [block_coordinate, block_coordinate + block_size]
@@ -44,8 +45,6 @@ def _process_blocks(args):
                bbox[0][2]: bbox[1][2]] = remapped_seg
 
         print(f"written {bbox}")
-
-        break
 
 
 def process_dataset(cg, cv_out_path, block_size=[512, 512, 128], mip=0,
@@ -68,7 +67,7 @@ def process_dataset(cg, cv_out_path, block_size=[512, 512, 128], mip=0,
                                                  len(block_coords),
                                                  replace=False)]
 
-    block_coord_blocks = np.array_split(block_coords, 100)
+    block_coord_blocks = np.array_split(block_coords, n_threads * 3)
 
     cg_serialized_info = cg.get_serialized_info()
 
