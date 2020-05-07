@@ -12,7 +12,7 @@ else:
     REDIS_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0'
 
 # Queues to listen on
-QUEUES = ['default', 'mesh-chunks']
+QUEUES = ['default', 'mesh']
 
 # If you're using Sentry to collect your runtime exceptions, you can use this
 # to configure RQ for it in a single step

@@ -150,7 +150,7 @@ def api_exception(e):
 def handle_valid_frags(table_id, node_id):
     current_app.table_id = table_id
 
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     cg = app_utils.get_cg(table_id)
@@ -169,7 +169,7 @@ def handle_get_manifest(table_id, node_id):
     current_app.request_type = "manifest"
     current_app.table_id = table_id
 
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     if len(request.data) > 0:

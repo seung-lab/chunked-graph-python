@@ -410,7 +410,7 @@ def get_lx_overlapping_remappings(cg, chunk_id, time_stamp=None, n_threads=1):
     layer_agreement = np.all(
         (neigh_parent_chunk_ids - neigh_parent_chunk_ids[0]) == 0, axis=0
     )
-    stop_layer = np.where(layer_agreement)[0][0] + 1 + chunk_layer
+    stop_layer = np.where(layer_agreement)[0][0] + chunk_layer
     # stop_layer = cg.n_layers
 
     print(f"Stop layer: {stop_layer}")
@@ -797,7 +797,7 @@ def transform_draco_fragment_and_return_encoding_options(
     return cur_encoding_settings
 
 
-def merge_draco_meshes_across_boundaries(cg, fragments, chunk_id, mip, high_padding):
+def merge_draco_meshes_across_boundaries(cg, fragments, chunk_id, mip, high_padding, return_zmesh_object=False):
     """
     Merge a list of draco mesh fragments, removing duplicate vertices that lie
     on the chunk boundary where the meshes meet.
@@ -875,6 +875,9 @@ def merge_draco_meshes_across_boundaries(cg, fragments, chunk_id, mip, high_padd
             vertices = not_chunk_aligned[:, 0:3]
         # Remap the faces to their new vertex indices
         fastremap.remap(faces, faces_remapping, in_place=True)
+
+    if return_zmesh_object:
+        return zmesh.Mesh(vertices[:,0:3], faces.reshape(-1,3), None)
 
     return {
         "num_vertices": np.uint32(len(vertices)),
@@ -987,12 +990,12 @@ def remeshing(
             )
 
 
-REDIS_HOST = os.environ.get("REDIS_SERVICE_HOST", "localhost")
+REDIS_HOST = os.environ.get("REDIS_SERVICE_HOST", "10.250.2.186")
 REDIS_PORT = os.environ.get("REDIS_SERVICE_PORT", "6379")
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "dev")
 REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
-
-def chunk_mesh_task_sharded_meshing(
+@redis_job(REDIS_URL, 'mesh_frag_test_channel')
+def chunk_mesh_task_sharded_meshing_opt(
     cg_info,
     chunk_id,
     # layer,
@@ -1002,8 +1005,187 @@ def chunk_mesh_task_sharded_meshing(
     max_err=320,
     high_padding=1
 ):
+    start_existence_check_time = time.time()
     if cg is None:
-        cg = chunkedgraph.ChunkedGraph(**cg_info)
+        cg = chunkedgraph.ChunkedGraph(cg_info)
+    cx, cy, cz = cg.get_chunk_coordinates(chunk_id)
+    layer = cg.get_chunk_layer(chunk_id)
+    range_read = cg.range_read_chunk(
+        layer, cx, cy, cz, columns=column_keys.Hierarchy.Child
+    )
+    node_ids = np.array(list(range_read.keys()))
+    node_rows = np.array(list(range_read.values()))
+    child_fragments = np.array(
+        [
+            fragment.value
+            for child_fragments_for_node in node_rows
+            for fragment in child_fragments_for_node
+        ]
+    )
+    # Only keep nodes with more than one child
+    multi_child_mask = [len(fragments) > 1 for fragments in child_fragments]
+    multi_child_node_ids = node_ids[multi_child_mask]
+    multi_child_children_ids = child_fragments[multi_child_mask]
+    # Store how many children each node has, because we will retrieve all children at once
+    multi_child_num_children = [
+        len(children) for children in multi_child_children_ids
+    ]
+    child_fragments_flat = np.array(
+        [
+            frag
+            for children_of_node in multi_child_children_ids
+            for frag in children_of_node
+        ]
+    )
+    multi_child_descendants = meshgen_utils.get_downstream_multi_child_nodes(
+        cg, child_fragments_flat
+    )
+    start_index = 0
+    multi_child_nodes = {}
+    for i in range(len(multi_child_node_ids)):
+        end_index = start_index + multi_child_num_children[i]
+        descendents_for_current_node = multi_child_descendants[
+            start_index:end_index
+        ]
+        multi_child_nodes[multi_child_node_ids[i]] = descendents_for_current_node
+        start_index = end_index
+    cv = cloudvolume.CloudVolume('graphene://https://prodv1.flywire-daf.com/segmentation/table/fly_v31', mesh_dir='graphene_meshes')
+    chunk_ids = []
+    chunk_pos_numbers = []
+    for i in range(2):
+        for j in range(2):
+            for k in range(2):
+                cur_chunk_id = cg.get_chunk_id(layer=layer-1, x=cx*2+i, y=cy*2+j, z=cz*2+k)
+                chunk_ids.append(cur_chunk_id)
+                chunk_pos_numbers.append(cv.meta.decode_chunk_position_number(cur_chunk_id))
+
+    shard_filenames = []
+    for chunk_pos in chunk_pos_numbers:
+        shard_filenames.append(str(chunk_pos) + '-0.shard')
+
+    dict_to_index = {}
+    disassembled_shards = []
+    with Storage(os.path.join(cv.cloudpath, cv.mesh.meta.mesh_path, 'initial', str(layer-1))) as storage:
+        files_contents = storage.get_files(shard_filenames)
+        for i in range(len(files_contents)):
+            dict_to_index[int(files_contents[i]['filename'][:-8])] = i
+            disassembled_shards.append(cv.mesh.readers[layer-1].disassemble_shard(files_contents[i]['content']))
+        del files_contents
+
+    number_frags_proc = 0
+    sharding_info = cv.mesh.meta.info['sharding'][str(layer)]
+    sharding_spec = ShardingSpecification.from_dict(sharding_info)
+    merged_meshes = {}
+    biggest_frag = 0
+    biggest_frag_vx_ct = 0
+    for new_fragment_id, fragment_ids_to_fetch in multi_child_nodes.items():
+        # old_fragments = list(cv.mesh.get(fragment_ids_to_fetch).values())
+        old_fragments = []
+        for frag_to_fetch in fragment_ids_to_fetch:
+            lookup_int = cv.meta.decode_chunk_position_number(frag_to_fetch)
+            try:
+                old_fragments.append(
+                    {
+                        "mesh": decode_draco_mesh_buffer(
+                            disassembled_shards[dict_to_index[lookup_int]][frag_to_fetch]
+                        ),
+                        "node_id": np.uint64(frag_to_fetch),
+                    }
+                )
+            except:
+                # import ipdb
+                # ipdb.set_trace()
+                pass
+        if len(old_fragments) > 0:
+            # import ipdb
+            # ipdb.set_trace()
+            # for i in range(len(old_fragments)):
+            #     new_old_frag = {
+            #         "num_vertices": len(old_fragments[i].vertices),
+            #         "vertices": old_fragments[i].vertices,
+            #         "faces": old_fragments[i].faces.reshape(-1),
+            #         "encoding_options": old_fragments[i].encoding_options,
+            #         "encoding_type": "draco"
+            #     }
+            #     wrapper_object = {
+            #         "mesh": new_old_frag,
+            #         "node_id": np.uint64(old_fragments[i].segid)
+            #     }
+            #     old_fragments[i] = wrapper_object
+
+            draco_encoding_options = None
+            for old_fragment in old_fragments:
+                if draco_encoding_options is None:
+                    draco_encoding_options = transform_draco_fragment_and_return_encoding_options(
+                        cg, old_fragment, layer, mip, chunk_id
+                    )
+                else:
+                    encoding_options_for_fragment = transform_draco_fragment_and_return_encoding_options(
+                        cg, old_fragment, layer, mip, chunk_id
+                    )
+                    np.testing.assert_equal(
+                        draco_encoding_options["quantization_bits"],
+                        encoding_options_for_fragment["quantization_bits"],
+                    )
+                    np.testing.assert_equal(
+                        draco_encoding_options["quantization_range"],
+                        encoding_options_for_fragment["quantization_range"],
+                    )
+                    np.testing.assert_array_equal(
+                        draco_encoding_options["quantization_origin"],
+                        encoding_options_for_fragment["quantization_origin"],
+                    )
+
+            new_fragment = merge_draco_meshes_across_boundaries(
+                cg, old_fragments, chunk_id, mip, high_padding
+            )
+
+            # import ipdb; ipdb.set_trace()
+
+            if len(new_fragment["vertices"]) > biggest_frag_vx_ct:
+                biggest_frag = new_fragment_id
+                biggest_frag_vx_ct = len(new_fragment["vertices"])
+
+            try:
+                new_fragment_b = DracoPy.encode_mesh_to_buffer(
+                    new_fragment["vertices"],
+                    new_fragment["faces"],
+                    **draco_encoding_options,
+                )
+                merged_meshes[int(new_fragment_id)] = new_fragment_b
+            except:
+                print('failed to merge')
+                pass
+            number_frags_proc = number_frags_proc + 1
+            if number_frags_proc % 100 == 0:
+                print(f'number frag proc = {number_frags_proc}')
+    print(f'biggest frag = {biggest_frag}')
+    shard_binary = sharding_spec.synthesize_shard(merged_meshes)
+    shard_filename = cv.mesh.readers[layer].get_filename(chunk_id)
+    with Storage(os.path.join(cv.cloudpath, cv.mesh.meta.mesh_path, 'initial', str(layer))) as storage:
+        storage.put_file(
+            shard_filename,
+            shard_binary,
+            content_type="application/octet-stream",
+            compress=False,
+            cache_control="no-cache",
+        )
+    total_time = time.time() - start_existence_check_time
+    return [int(chunk_id), int(total_time)]
+
+def chunk_mesh_task_sharded_meshing(
+    cg_name,
+    chunk_id,
+    # layer,
+    mip,
+    cv_mesh_dir=None,
+    cg=None,
+    max_err=320,
+    high_padding=1
+):
+    start_existence_check_time = time.time()
+    if cg is None:
+        cg = chunkedgraph.ChunkedGraph(cg_name)
     cx, cy, cz = cg.get_chunk_coordinates(chunk_id)
     layer = cg.get_chunk_layer(chunk_id)
     range_read = cg.range_read_chunk(
@@ -1039,18 +1221,18 @@ def chunk_mesh_task_sharded_meshing(
     start_index = 0
     multi_child_nodes = {}
     # for i in range(len(multi_child_node_ids)):
-    for i in range(1000):
+    for i in range(100):
         end_index = start_index + multi_child_num_children[i]
         descendents_for_current_node = multi_child_descendants[
             start_index:end_index
         ]
         multi_child_nodes[multi_child_node_ids[i]] = descendents_for_current_node
         start_index = end_index
+    number_frags_proc = 0
     cv = cloudvolume.CloudVolume('graphene://https://prodv1.flywire-daf.com/segmentation/table/fly_v31', mesh_dir='graphene_meshes')
     # mesh_exists = cv.mesh.readers[2].exists(labels=multi_child_descendants[0:3000], path='graphene_meshes/initial/2/', return_byte_range=True)
     sharding_info = cv.mesh.meta.info['sharding'][str(layer)]
     sharding_spec = ShardingSpecification.from_dict(sharding_info)
-    start_existence_check_time = time.time()
     merged_meshes = {}
     biggest_frag = 0
     biggest_frag_vx_ct = 0
@@ -1095,31 +1277,51 @@ def chunk_mesh_task_sharded_meshing(
                     )
 
             new_fragment = merge_draco_meshes_across_boundaries(
-                cg, old_fragments, chunk_id, mip, high_padding
+                cg, old_fragments, chunk_id, mip, high_padding, return_zmesh_object=True
             )
 
-            if len(new_fragment["vertices"]) > biggest_frag_vx_ct:
+            # skip_list = [4, 5]
+            # if number_frags_proc in skip_list:
+            #     import ipdb; ipdb.set_trace()
+            #     number_frags_proc = number_frags_proc + 1
+            #     continue
+            test_col = np.vstack((new_fragment.faces[:,0]-new_fragment.faces[:,1], new_fragment.faces[:,0]-new_fragment.faces[:,2], new_fragment.faces[:,1]-new_fragment.faces[:,2])).T
+            remove_eles = np.where(test_col == 0)
+            if len(remove_eles[0]) > 0:
+                new_fragment.faces = np.delete(new_fragment.faces, remove_eles[0], axis=0)
+            offset = np.array(cv.mip_voxel_offset(mip))
+            resolution = np.array(cv.mip_resolution(mip))
+            new_fragment.vertices -= offset
+            new_fragment.vertices /= resolution
+            mesher = zmesh.Mesher(np.flip(resolution))
+            simplified_mesh = mesher.simplify(new_fragment, reduction_factor=999999, max_error=1.0)
+            # simplified_mesh.vertices *= resolution
+            simplified_mesh.vertices += np.flip(offset)
+            # simplified_mesh = mesher.simplify(new_fragment, reduction_factor=0, max_error=320)
+            del old_fragments
+            del new_fragment
+
+            if len(simplified_mesh.vertices) > biggest_frag_vx_ct:
                 biggest_frag = new_fragment_id
-                biggest_frag_vx_ct = len(new_fragment["vertices"])
+                biggest_frag_vx_ct = len(simplified_mesh.vertices)
 
             try:
-                # import ipdb
-                # ipdb.set_trace()
+                draco_encoding_options['vertices_zyx'] = True
                 new_fragment_b = DracoPy.encode_mesh_to_buffer(
-                    new_fragment["vertices"],
-                    new_fragment["faces"],
+                    simplified_mesh.vertices.reshape(-1),
+                    simplified_mesh.faces.reshape(-1),
                     **draco_encoding_options,
                 )
                 merged_meshes[int(new_fragment_id)] = new_fragment_b
             except:
                 print('failed to merge')
                 pass
-    print(f'biggest frag = ${biggest_frag}')
+            number_frags_proc = number_frags_proc + 1
+            # print(f'number frag proc = {number_frags_proc}')
+    print(f'biggest frag = {biggest_frag}')
     # import ipdb
     # ipdb.set_trace()
     shard_binary = sharding_spec.synthesize_shard(merged_meshes)
-    import ipdb
-    ipdb.set_trace()
     shard_filename = cv.mesh.readers[layer].get_filename(chunk_id)
     with Storage(os.path.join(cv.cloudpath, cv.mesh.meta.mesh_path, 'initial', str(layer))) as storage:
         storage.put_file(
@@ -1136,7 +1338,8 @@ def chunk_mesh_task_sharded_meshing(
             # print(i)
         # i = i + 1
         # mesh_exists.append(cv.mesh.readers[2].exists(cur_child))
-    print(time.time() - start_existence_check_time)
+    total_time = time.time() - start_existence_check_time
+    return [int(chunk_id), int(total_time)]
 
 # @redis_job(REDIS_URL, 'mesh_frag_test_channel')
 # TODO: refactor this bloated function
@@ -1413,8 +1616,6 @@ def chunk_mesh_task_new_remapping(
                         new_fragment["faces"],
                         **draco_encoding_options,
                     )
-                    import ipdb
-                    ipdb.set_trace()
                 except:
                     new_fragment_str = new_fragment_id[0 : new_fragment_id.find(":")]
                     result.append(

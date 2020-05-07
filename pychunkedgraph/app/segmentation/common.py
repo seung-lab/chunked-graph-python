@@ -182,6 +182,8 @@ def handle_info(table_id):
     dataset_info = cg.dataset_info
     app_info = {"app": {"supported_api_versions": list(__api_versions__)}}
     combined_info = {**dataset_info, **app_info}
+    combined_info["sharded_mesh"] = True
+    combined_info["mesh"] = "graphene_meshes"
 
     return jsonify(combined_info)
 
@@ -196,7 +198,7 @@ def handle_api_versions():
 def handle_root(table_id, atomic_id):
     current_app.table_id = table_id
 
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     # Convert seconds since epoch to UTC datetime
@@ -323,7 +325,7 @@ def handle_merge(table_id):
     current_app.table_id = table_id
 
     nodes = json.loads(request.data)
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     current_app.logger.debug(nodes)
@@ -400,7 +402,7 @@ def handle_split(table_id):
     current_app.table_id = table_id
 
     data = json.loads(request.data)
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     current_app.logger.debug(data)
@@ -476,7 +478,7 @@ def handle_undo(table_id):
     current_app.table_id = table_id
 
     data = json.loads(request.data)
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     current_app.logger.debug(data)
@@ -513,7 +515,7 @@ def handle_redo(table_id):
     current_app.table_id = table_id
 
     data = json.loads(request.data)
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     current_app.logger.debug(data)
@@ -548,7 +550,7 @@ def handle_redo(table_id):
 
 def handle_children(table_id, parent_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     cg = app_utils.get_cg(table_id)
@@ -569,7 +571,7 @@ def handle_children(table_id, parent_id):
 
 def handle_leaves(table_id, root_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     if "bounds" in request.args:
@@ -594,7 +596,7 @@ def handle_leaves(table_id, root_id):
 
 def handle_leaves_from_leave(table_id, atomic_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     if "bounds" in request.args:
@@ -621,7 +623,7 @@ def handle_leaves_from_leave(table_id, atomic_id):
 
 def handle_subgraph(table_id, root_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     if "bounds" in request.args:
@@ -646,7 +648,7 @@ def handle_subgraph(table_id, root_id):
 
 def change_log(table_id, root_id=None):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     try:
@@ -671,7 +673,7 @@ def change_log(table_id, root_id=None):
 
 def tabular_change_log_recent(table_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     try:
@@ -711,7 +713,7 @@ def tabular_change_log_recent(table_id):
 def tabular_change_log(table_id, root_id):
     current_app.request_type = "tabular_changelog"
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     # Call ChunkedGraph
@@ -723,7 +725,7 @@ def tabular_change_log(table_id, root_id):
 
 def merge_log(table_id, root_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     try:
@@ -745,7 +747,7 @@ def merge_log(table_id, root_id):
 
 def last_edit(table_id, root_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     cg = app_utils.get_cg(table_id)
@@ -757,7 +759,7 @@ def last_edit(table_id, root_id):
 
 def oldest_timestamp(table_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     cg = app_utils.get_cg(table_id)
@@ -779,7 +781,7 @@ def handle_contact_sites(table_id, root_id):
     areas_only = request.args.get("areas_only", True, type=app_utils.toboolean)
 
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     try:
@@ -818,7 +820,7 @@ def handle_contact_sites(table_id, root_id):
 def handle_pairwise_contact_sites(table_id, first_node_id, second_node_id):
     current_app.request_type = "pairwise_contact_sites"
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     try:
@@ -848,7 +850,7 @@ def handle_pairwise_contact_sites(table_id, first_node_id, second_node_id):
 
 def handle_split_preview(table_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     data = json.loads(request.data)
@@ -906,7 +908,7 @@ def handle_split_preview(table_id):
 
 def handle_find_path(table_id):
     current_app.table_id = table_id
-    user_id = str(g.auth_user["id"])
+    user_id = str("manuel_test")
     current_app.user_id = user_id
 
     nodes = json.loads(request.data)

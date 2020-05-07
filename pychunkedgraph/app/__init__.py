@@ -21,6 +21,9 @@ from .segmentation.legacy.routes import bp as segmentation_api_legacy
 from .segmentation.v1.routes import bp as segmentation_api_v1
 from .segmentation.generic.routes import bp as generic_api
 
+# from .rq_cli import init_rq_cmds
+from ..meshing.meshing_test_temp import init_mesh_cmds
+
 
 class CustomJsonEncoder(json.JSONEncoder):
     def __init__(self, int64_as_str=False, **kwargs):
@@ -89,3 +92,6 @@ def configure_app(app):
     if app.config['USE_REDIS_JOBS']:
         app.redis = redis.Redis.from_url(app.config['REDIS_URL'])
         app.test_q = Queue('test', connection=app.redis)
+        with app.app_context():
+            init_mesh_cmds(app)
+            # init_rq_cmds(app)
