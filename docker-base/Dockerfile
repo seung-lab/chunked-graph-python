@@ -13,6 +13,8 @@ RUN mkdir -p /home/nginx/.cloudvolume/secrets \
       lsb-release \
       curl \
       apt-transport-https \
+      ca-certificates \
+      gnupg \
   # GOOGLE-CLOUD-SDK
   && pip install --no-cache-dir --upgrade crcmod \
   && echo "deb https://packages.cloud.google.com/apt cloud-sdk-$(lsb_release -c -s) main" > /etc/apt/sources.list.d/google-cloud-sdk.list \
