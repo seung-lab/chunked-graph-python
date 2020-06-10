@@ -13,9 +13,11 @@ if __name__ == "__main__":
     parser.add_argument('--layer', type=int)
     parser.add_argument('--mip', type=int)
     parser.add_argument('--graphene_path', type=str)
+    parser.add_argument('--mesh_dir', type=str)
 
     args = parser.parse_args()
-    cv_mesh_dir = 'graphene_meshes'
+    cv_mesh_dir = args.mesh_dir
+    # cv_mesh_dir = 'graphene_meshes'
 
     cg = ChunkedGraph(graph_id=args.cg_name)
 
