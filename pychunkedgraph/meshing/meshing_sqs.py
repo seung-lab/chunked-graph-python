@@ -19,3 +19,18 @@ class MeshTask(RegisteredTask):
         )
         print(pickle.loads(blah))
 
+
+class MeshTaskSlow(RegisteredTask):
+    def __init__(self, cg_name, chunk_id, mip, cv_graphene_path, cv_mesh_dir, shard_number):
+        super().__init__(cg_name, chunk_id, mip, cv_graphene_path, cv_mesh_dir, shard_number)
+
+    def execute(self):
+        cg_name = self.cg_name
+        chunk_id = np.uint64(self.chunk_id)
+        cv_graphene_path = self.cv_graphene_path
+        cv_mesh_dir = self.cv_mesh_dir
+        mip = self.mip
+        blah = meshgen.chunk_initial_sharded_stitching_task_slow(
+            cg_name, chunk_id, mip, cv_graphene_path, cv_mesh_dir, self.shard_number
+        )
+        print(pickle.loads(blah))

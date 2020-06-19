@@ -97,6 +97,7 @@ class ChunkedGraph:
             typing.Union[typing.Iterable[attributes._Attribute], attributes._Attribute]
         ] = None,
         time_stamp: typing.Optional[datetime.datetime] = None,
+        start_time_stamp: typing.Optional[datetime.datetime] = None
     ) -> typing.Dict:
         """Read all nodes in a chunk."""
         layer = self.get_chunk_layer(chunk_id)
@@ -109,6 +110,7 @@ class ChunkedGraph:
             end_id=max_node_id,
             end_id_inclusive=True,
             properties=properties,
+            start_time=start_time_stamp,
             end_time=time_stamp,
             end_time_inclusive=True,
         )

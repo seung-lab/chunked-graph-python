@@ -981,18 +981,34 @@ def chunk_initial_unsharded_mesh_task(
     return ", ".join(str(x) for x in result)
 
 
-def get_multi_child_nodes(cg, chunk_id, node_id_subset=None, chunk_bbox_string=False):
+def get_multi_child_nodes(cg, chunk_id, node_id_subset=None, chunk_bbox_string=False, shard_number=None, cv=None, time_stamp=None):
     if node_id_subset is None:
+        time_stamp = datetime.datetime(2020, 6, 16, 17, 15, 59, 172394)
         range_read = cg.range_read_chunk(
-            chunk_id, properties=attributes.Hierarchy.Child
+            chunk_id, properties=attributes.Hierarchy.Child, start_time_stamp=time_stamp
         )
     else:
         range_read = cg.client.read_nodes(
             node_ids=node_id_subset, properties=attributes.Hierarchy.Child
         )
 
-    node_ids = np.array(list(range_read.keys()))
-    node_rows = np.array(list(range_read.values()))
+    if shard_number is None:
+        node_ids = np.array(list(range_read.keys()))
+        node_rows = np.array(list(range_read.values()))
+    else:
+        assert cv is not None
+        node_ids = []
+        node_rows = []
+        layer = cg.get_chunk_layer(chunk_id)
+        for node_id in range_read:
+            shard_number_for_fragment = int(cv.mesh.readers[layer].spec.compute_shard_location(node_id).shard_number)
+            if shard_number_for_fragment == shard_number:
+                node_ids.append(node_id)
+                node_rows.append(range_read[node_id])
+        node_ids = np.array(node_ids)
+        node_rows = np.array(node_rows)
+    # import ipdb
+    # ipdb.set_trace()
     child_fragments = np.array(
         [
             fragment.value
@@ -1034,6 +1050,8 @@ def get_multi_child_nodes(cg, chunk_id, node_id_subset=None, chunk_bbox_string=F
             multi_child_nodes[multi_child_node_ids[i]] = descendents_for_current_node
         start_index = end_index
 
+    # import ipdb
+    # ipdb.set_trace()
     return multi_child_nodes, multi_child_descendants
 
 
@@ -1348,7 +1366,7 @@ def chunk_initial_sharded_stitching_task(
             shard_binary,
             content_type="application/octet-stream",
             compress=False,
-            cache_control="no-cache",
+            cache_control="public",
         )
     total_time = time.time() - start_existence_check_time
     import pickle
@@ -1474,6 +1492,131 @@ def chunk_initial_sharded_stitching_task(
 #     return pickle.dumps(ret)
 
 
+# def chunk_initial_sharded_stitching_task_slow(
+#     cg_name, chunk_id, mip, cv_graphene_path, cv_mesh_dir, shard_number, cg=None, high_padding=1
+# ):
+#     start_existence_check_time = time.time()
+#     if cg is None:
+#         cg = ChunkedGraph(graph_id=cg_name)
+
+#     layer = cg.get_chunk_layer(chunk_id)
+#     multi_child_nodes, multi_child_descendants = get_multi_child_nodes(cg, chunk_id)
+
+#     chunk_to_id_dict = collections.defaultdict(list)
+#     for child_node in multi_child_descendants:
+#         cur_chunk_id = int(cg.get_chunk_id(child_node))
+#         chunk_to_id_dict[cur_chunk_id].append(child_node)
+
+#     cv = CloudVolume(cv_graphene_path, mesh_dir=cv_mesh_dir)
+#     shard_filenames = []
+#     shard_to_chunk_id = {}
+#     for cur_chunk_id in chunk_to_id_dict:
+#         shard_id = cv.meta.decode_chunk_position_number(cur_chunk_id)
+#         shard_filename = (
+#             str(cg.get_chunk_layer(cur_chunk_id)) + "/" + str(shard_id) + "-0.shard"
+#         )
+#         shard_to_chunk_id[shard_filename] = cur_chunk_id
+#         shard_filenames.append(shard_filename)
+#     mesh_dict = {}
+
+#     with Storage(
+#         os.path.join(cv.cloudpath, cv.mesh.meta.mesh_path, "initial")
+#     ) as storage:
+#         files_contents = storage.get_files(shard_filenames)
+#         for i in range(len(files_contents)):
+#             cur_chunk_id = shard_to_chunk_id[files_contents[i]["filename"]]
+#             cur_layer = cg.get_chunk_layer(cur_chunk_id)
+#             if files_contents[i]["content"] is not None:
+#                 disassembled_shard = cv.mesh.readers[cur_layer].disassemble_shard(
+#                     files_contents[i]["content"]
+#                 )
+#                 nodes_in_chunk = chunk_to_id_dict[int(cur_chunk_id)]
+#                 for node_in_chunk in nodes_in_chunk:
+#                     node_in_chunk_int = int(node_in_chunk)
+#                     if node_in_chunk_int in disassembled_shard:
+#                         mesh_dict[node_in_chunk_int] = disassembled_shard[node_in_chunk]
+#         del files_contents
+
+#     number_frags_proc = 0
+#     sharding_info = cv.mesh.meta.info["sharding"][str(layer)]
+#     sharding_spec = ShardingSpecification.from_dict(sharding_info)
+#     merged_meshes = {}
+#     biggest_frag = 0
+#     biggest_frag_vx_ct = 0
+#     bad_meshes = []
+#     for new_fragment_id in multi_child_nodes:
+#         fragment_ids_to_fetch = multi_child_nodes[new_fragment_id]
+#         old_fragments = []
+#         for frag_to_fetch in fragment_ids_to_fetch:
+#             try:
+#                 old_fragments.append(
+#                     {
+#                         "mesh": decode_draco_mesh_buffer(mesh_dict[int(frag_to_fetch)]),
+#                         "node_id": np.uint64(frag_to_fetch),
+#                     }
+#                 )
+#             except:
+#                 pass
+#         if len(old_fragments) > 0:
+#             draco_encoding_options = None
+#             for old_fragment in old_fragments:
+#                 if draco_encoding_options is None:
+#                     draco_encoding_options = transform_draco_fragment_and_return_encoding_options(
+#                         cg, old_fragment, layer, mip, chunk_id
+#                     )
+#                 else:
+#                     transform_draco_fragment_and_return_encoding_options(
+#                         cg, old_fragment, layer, mip, chunk_id
+#                     )
+
+#             new_fragment = merge_draco_meshes_across_boundaries(
+#                 cg, old_fragments, chunk_id, mip, high_padding
+#             )
+
+#             if len(new_fragment["vertices"]) > biggest_frag_vx_ct:
+#                 biggest_frag = new_fragment_id
+#                 biggest_frag_vx_ct = len(new_fragment["vertices"])
+
+#             try:
+#                 new_fragment_b = DracoPy.encode_mesh_to_buffer(
+#                     new_fragment["vertices"],
+#                     new_fragment["faces"],
+#                     **draco_encoding_options,
+#                 )
+#                 merged_meshes[int(new_fragment_id)] = new_fragment_b
+#             except:
+#                 print(f"failed to merge {new_fragment_id}")
+#                 bad_meshes.append(new_fragment_id)
+#                 pass
+#             number_frags_proc = number_frags_proc + 1
+#             if number_frags_proc % 1000 == 0:
+#                 print(f"number frag proc = {number_frags_proc}")
+#     del mesh_dict
+#     shard_binary = sharding_spec.synthesize_shard(merged_meshes)
+#     shard_filename = cv.mesh.readers[layer].get_filename(chunk_id)
+#     with Storage(
+#         os.path.join(cv.cloudpath, cv.mesh.meta.mesh_path, "initial", str(layer))
+#     ) as storage:
+#         storage.put_file(
+#             shard_filename,
+#             shard_binary,
+#             content_type="application/octet-stream",
+#             compress=False,
+#             cache_control="no-cache",
+#         )
+#     total_time = time.time() - start_existence_check_time
+#     import pickle
+
+#     ret = {
+#         "chunk_id": chunk_id,
+#         "total_time": total_time,
+#         "biggest_frag": biggest_frag,
+#         "biggest_frag_vx_ct": biggest_frag_vx_ct,
+#         "number_frag": number_frags_proc,
+#         "bad meshes": bad_meshes,
+#     }
+#     return pickle.dumps(ret)
+
 def chunk_initial_sharded_stitching_task_slow(
     cg_name, chunk_id, mip, cv_graphene_path, cv_mesh_dir, shard_number, cg=None, high_padding=1
 ):
@@ -1482,14 +1625,14 @@ def chunk_initial_sharded_stitching_task_slow(
         cg = ChunkedGraph(graph_id=cg_name)
 
     layer = cg.get_chunk_layer(chunk_id)
-    multi_child_nodes, multi_child_descendants = get_multi_child_nodes(cg, chunk_id)
+    cv = CloudVolume(cv_graphene_path, mesh_dir=cv_mesh_dir)
+    multi_child_nodes, multi_child_descendants = get_multi_child_nodes(cg, chunk_id, shard_number=shard_number, cv=cv)
 
     chunk_to_id_dict = collections.defaultdict(list)
     for child_node in multi_child_descendants:
         cur_chunk_id = int(cg.get_chunk_id(child_node))
         chunk_to_id_dict[cur_chunk_id].append(child_node)
 
-    cv = CloudVolume(cv_graphene_path, mesh_dir=cv_mesh_dir)
     shard_filenames = []
     shard_to_chunk_id = {}
     for cur_chunk_id in chunk_to_id_dict:
@@ -1575,12 +1718,16 @@ def chunk_initial_sharded_stitching_task_slow(
                 print(f"number frag proc = {number_frags_proc}")
     del mesh_dict
     shard_binary = sharding_spec.synthesize_shard(merged_meshes)
+    # shard_filename = cv.mesh.readers[layer].get_filename(chunk_id)
     shard_filename = cv.mesh.readers[layer].get_filename(chunk_id)
+    dash_index = shard_filename.index('-')
+    dot_index = shard_filename.index('.')
+    revised_filename = shard_filename[0:dash_index+1] + str(shard_number) + shard_filename[dot_index:]
     with Storage(
         os.path.join(cv.cloudpath, cv.mesh.meta.mesh_path, "initial", str(layer))
     ) as storage:
         storage.put_file(
-            shard_filename,
+            revised_filename,
             shard_binary,
             content_type="application/octet-stream",
             compress=False,
