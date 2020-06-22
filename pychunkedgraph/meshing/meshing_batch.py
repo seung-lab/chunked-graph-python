@@ -31,28 +31,28 @@ if __name__ == "__main__":
 
     np.random.shuffle(chunks_arr)
 
-    # cv = CloudVolume(args.graphene_path, mesh_dir=cv_mesh_dir)
-    # stor = Storage(cg.meta.data_source.WATERSHED + '/' + cv_mesh_dir + '/initial/' + str(args.layer))
-    # files_to_get = []
-    # j = 0
-    # for chunk in chunks_arr:
-    #     chunk_id = cg.get_chunk_id(layer=args.layer, x=chunk[0], y=chunk[1], z=chunk[2])
-    #     shard_filename = cv.mesh.readers[args.layer].get_filename(chunk_id)
-    #     dash_index = shard_filename.index('-')
-    #     for i in range(args.max_shard_number):
-    #         files_to_get.append(shard_filename[0:dash_index+1] + str(i) + '.shard')
-    #     if j % 10000 == 0 and j > 0:
-    #         break
-    #     j = j + 1
-    # print("files")
-    # # files_to_get = files_to_get[0:2000]
-    # found_files = stor.files_exist(files_to_get)
-    # # found_files = {}
-    # # for cur_file in stor_result:
-    # #     if cur_file["content"] is not None:
-    # #         found_files[cur_file["filename"]] = True
-    # import ipdb
-    # ipdb.set_trace()
+    cv = CloudVolume(args.graphene_path, mesh_dir=cv_mesh_dir)
+    stor = Storage(cg.meta.data_source.WATERSHED + '/' + cv_mesh_dir + '/initial/' + str(args.layer))
+    files_to_get = []
+    j = 0
+    for chunk in chunks_arr:
+        chunk_id = cg.get_chunk_id(layer=args.layer, x=chunk[0], y=chunk[1], z=chunk[2])
+        shard_filename = cv.mesh.readers[args.layer].get_filename(chunk_id)
+        dash_index = shard_filename.index('-')
+        for i in range(args.max_shard_number):
+            files_to_get.append(shard_filename[0:dash_index+1] + str(i) + '.shard')
+        if j % 10000 == 0 and j > 0:
+            break
+        j = j + 1
+    print("files")
+    # files_to_get = files_to_get[0:2000]
+    found_files = stor.files_exist(files_to_get)
+    # found_files = {}
+    # for cur_file in stor_result:
+    #     if cur_file["content"] is not None:
+    #         found_files[cur_file["filename"]] = True
+    import ipdb
+    ipdb.set_trace()
 
 
     class MeshTaskIterator(object):
@@ -64,12 +64,12 @@ if __name__ == "__main__":
                 if args.max_shard_number is None:
                     yield MeshTask(args.cg_name, int(chunk_id), args.mip, args.graphene_path, cv_mesh_dir)
                 else:
-                    # shard_filename = cv.mesh.readers[args.layer].get_filename(chunk_id)
-                    # dash_index = shard_filename.index('-')
+                    shard_filename = cv.mesh.readers[args.layer].get_filename(chunk_id)
+                    dash_index = shard_filename.index('-')
                     for shard_no in range(args.max_shard_number):
-                    #     check_file = shard_filename[0:dash_index+1] + str(shard_no) + '.shard'
-                    #     if not found_files[check_file]:
-                        yield MeshTaskSlow(args.cg_name, int(chunk_id), args.mip, args.graphene_path, cv_mesh_dir, shard_number=shard_no)
+                        check_file = shard_filename[0:dash_index+1] + str(shard_no) + '.shard'
+                        if not found_files[check_file]:
+                            yield MeshTaskSlow(args.cg_name, int(chunk_id), args.mip, args.graphene_path, cv_mesh_dir, shard_number=shard_no)
 
     if args.queue_name is not None:
         with TaskQueue(queue_name=args.queue_name) as tq:

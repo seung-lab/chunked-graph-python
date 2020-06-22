@@ -1,0 +1,31 @@
+version: '3.7'
+
+services:
+
+  pcg_new1:
+    build:
+      context: .
+    image: pcg-svenmd-fafb-ingest_new
+    container_name: pcg_new
+    environment:
+      - FLASK_APP=run_dev.py
+      - REDIS_SERVICE_HOST=redis
+      - REDIS_SERVICE_PORT=6380
+      - REDIS_PASSWORD=dev
+    volumes:
+      - ~/SeungLab/newPCG/PyChunkedGraph:/app
+      - ~/.cloudvolume/secrets:/root/.cloudvolume/secrets
+    ports:
+      - '81:81'
+      - '4001:4001'
+      - '8889:8889'
+    command: [bash, -c, "pip install jupyter && jupyter notebook --ip=0.0.0.0 --port=8889 --allow-root --NotebookApp.token='' --NotebookApp.password=''"]
+    depends_on:
+      - redis_new
+
+  redis_new:
+    image: redis:5.0.4-alpine
+    container_name: redis_new
+    ports:
+      - '6380:6380'
+    command: ["redis-server", "--requirepass", "dev"]
