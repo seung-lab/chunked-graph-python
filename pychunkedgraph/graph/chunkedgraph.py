@@ -194,6 +194,7 @@ class ChunkedGraph:
             return [(p.value, p.timestamp) for p in parents]
         return self.cache.parent(node_id)
 
+    @profile
     def get_children(
         self,
         node_id_or_ids: typing.Union[typing.Iterable[np.uint64], np.uint64],
@@ -221,6 +222,7 @@ class ChunkedGraph:
             return np.concatenate([*node_children_d.values()])
         return node_children_d
 
+    @profile
     def _get_children_multiple(
         self, node_ids: typing.Iterable[np.uint64], *, raw_only=False,
     ) -> typing.Dict:
@@ -236,6 +238,7 @@ class ChunkedGraph:
             }
         return self.cache.children_multiple(node_ids)
 
+    @profile
     def get_atomic_cross_edges(
         self, l2_ids: typing.Iterable, *, raw_only=False,
     ) -> typing.Dict[np.uint64, typing.Dict[int, typing.Iterable]]:

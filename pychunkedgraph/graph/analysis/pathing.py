@@ -31,7 +31,7 @@ def get_first_shared_parent(cg, first_node_id: np.uint64, second_node_id: np.uin
             cur_second_node_parent = cg.get_parent(cur_second_node_parent)
     return None
 
-
+@profile
 def get_children_at_layer(
     cg, agglomeration_id: np.uint64, layer: int, allow_lower_layers: bool = False
 ):
@@ -58,7 +58,7 @@ def get_children_at_layer(
             break
     return np.concatenate(children_at_layer)
 
-
+@profile
 def find_l2_shortest_path(cg, source_l2_id: np.uint64, target_l2_id: np.uint64):
     """
     Find a path of level 2 ids that connect two level 2 node ids through cross chunk edges.
@@ -136,7 +136,7 @@ def find_l2_shortest_path(cg, source_l2_id: np.uint64, target_l2_id: np.uint64):
     l2_traversal_path = graph_indexed_l2_ids[vertex_indices]
     return l2_traversal_path
 
-
+#@profile
 def compute_rough_coordinate_path(cg, l2_ids):
     """
     Given a list of l2_ids, return a list of rough coordinates representing

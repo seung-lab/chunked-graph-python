@@ -103,6 +103,7 @@ class BigTableClient(bigtable.Client, ClientWithIDGen, OperationLogger):
     def read_graph_provenance(self) -> IngestConfig:
         return self._read_byte_row(attributes.GraphProvenance.key)
 
+    @profile
     def read_nodes(
         self,
         start_id=None,
@@ -552,6 +553,7 @@ class BigTableClient(bigtable.Client, ClientWithIDGen, OperationLogger):
             dtype=basetypes.SEGMENT_ID,
         )
 
+    @profile
     def _read_byte_rows(
         self,
         start_key: typing.Optional[bytes] = None,
@@ -694,6 +696,7 @@ class BigTableClient(bigtable.Client, ClientWithIDGen, OperationLogger):
             else row.get(row_key, {})
         )
 
+    @profile
     def _execute_read_thread(self, args: typing.Tuple[Table, RowSet, RowFilter]):
         table, row_set, row_filter = args
         if not row_set.row_keys and not row_set.row_ranges:
@@ -704,6 +707,7 @@ class BigTableClient(bigtable.Client, ClientWithIDGen, OperationLogger):
         res = {v.row_key: utils.partial_row_data_to_column_dict(v) for v in range_read}
         return res
 
+    @profile
     def _read(
         self, row_set: RowSet, row_filter: RowFilter = None
     ) -> typing.Dict[
