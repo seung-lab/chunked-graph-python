@@ -1,6 +1,6 @@
 from taskqueue import TaskQueue, LocalTaskQueue, MockTaskQueue
 import argparse
-from pychunkedgraph.graph.chunkedgraph import ChunkedGraph # noqa
+from pychunkedgraph.backend.chunkedgraph import ChunkedGraph # noqa
 import numpy as np
 from pychunkedgraph.meshing.meshing_sqs import MeshTask
 
