@@ -404,9 +404,12 @@ def old_parent_childrens(eh, node_ids, layer):
     next_layer_m = eh.cg.get_chunk_layers(old_next_layer_node_ids) == layer + 1
     old_next_layer_node_ids = old_next_layer_node_ids[next_layer_m]
 
-    old_this_layer_node_ids = np.unique(old_this_layer_node_ids)
-    this_layer_m = eh.cg.get_chunk_layers(old_this_layer_node_ids) == layer
-    old_this_layer_node_ids = old_this_layer_node_ids[this_layer_m]
+    old_this_layer_node_ids_all = np.unique(old_this_layer_node_ids)
+    this_layer_m = eh.cg.get_chunk_layers(old_this_layer_node_ids_all) == layer
+    old_this_layer_node_ids = old_this_layer_node_ids_all[this_layer_m]
+
+    lower_layer_m = eh.cg.get_chunk_layers(old_this_layer_node_ids_all) < layer
+    old_lower_layer_node_ids = old_this_layer_node_ids_all[lower_layer_m]
 
     # 2 - acquire their children
     old_this_layer_partner_ids = []
@@ -420,8 +423,15 @@ def old_parent_childrens(eh, node_ids, layer):
 
     old_this_layer_partner_ids = np.unique(old_this_layer_partner_ids)
 
-    return old_this_layer_node_ids, old_next_layer_node_ids, \
-           old_this_layer_partner_ids
+    return old_this_layer_partner_ids, old_lower_layer_node_ids
+
+
+def _update_edge_id_map(eh, layer, node_ids, edge_id_map, cross_edges_lvl1):
+    for node_id in node_ids:
+        node_cross_edges = eh.read_cross_chunk_edges(node_id)[layer]
+        edge_id_map.update(dict(zip(node_cross_edges[:, 0],
+                                    [node_id] * len(node_cross_edges))))
+        cross_edges_lvl1.extend(node_cross_edges)
 
 
 def compute_cross_chunk_connected_components(eh, node_ids, layer):
@@ -441,31 +451,26 @@ def compute_cross_chunk_connected_components(eh, node_ids, layer):
     # nodes. In practice, we (1) gather all relevant parents in the next
     # layer and then (2) acquire their children
 
-    old_this_layer_node_ids, old_next_layer_node_ids, \
-        old_this_layer_partner_ids = \
-            old_parent_childrens(eh, node_ids, layer)
+    old_layer_partner_ids, old_lower_layer_node_ids = old_parent_childrens(eh, node_ids, layer)
 
     # Build network from cross chunk edges
     edge_id_map = {}
     cross_edges_lvl1 = []
-    for node_id in node_ids:
-        node_cross_edges = eh.read_cross_chunk_edges(node_id)[layer]
-        edge_id_map.update(dict(zip(node_cross_edges[:, 0],
-                                    [node_id] * len(node_cross_edges))))
-        cross_edges_lvl1.extend(node_cross_edges)
-
-    for old_partner_id in old_this_layer_partner_ids:
-        node_cross_edges = eh.read_cross_chunk_edges(old_partner_id)[layer]
-
-        edge_id_map.update(dict(zip(node_cross_edges[:, 0],
-                                    [old_partner_id] * len(node_cross_edges))))
-        cross_edges_lvl1.extend(node_cross_edges)
-
-    cross_edges_lvl1 = np.array(cross_edges_lvl1)
     edge_id_map_vec = np.vectorize(edge_id_map.get)
 
+    _update_edge_id_map(eh, node_ids, edge_id_map, cross_edges_lvl1)
+    _update_edge_id_map(eh, old_layer_partner_ids, edge_id_map, cross_edges_lvl1)
+    cross_edges_lvl1_arr = np.array(cross_edges_lvl1)
+
     if len(cross_edges_lvl1) > 0:
-        cross_edges = edge_id_map_vec(cross_edges_lvl1)
+        try:
+            cross_edges = edge_id_map_vec(cross_edges_lvl1_arr)
+        except TypeError:  # NoneType error
+        # if there is a missing parent, try including lower layer ids
+        # this can happen due to skip connections
+            _update_edge_id_map(eh, old_lower_layer_node_ids, edge_id_map, cross_edges_lvl1)
+            cross_edges_lvl1_arr = np.array(cross_edges_lvl1)
+            cross_edges = edge_id_map_vec(cross_edges_lvl1_arr)
     else:
         cross_edges = np.empty([0, 2], dtype=np.uint64)
 
@@ -720,7 +725,7 @@ class EditHelper(object):
             return parents[-1]
 
     def get_layer_children(self, node_id, layer, layer_only=False):
-        """ Get 
+        """ Get
 
         :param node_id:
         :param layer:
