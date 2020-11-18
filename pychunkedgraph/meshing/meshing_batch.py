@@ -14,6 +14,7 @@ if __name__ == "__main__":
     parser.add_argument('--mip', type=int)
     parser.add_argument('--mesh_path', type=str)
     parser.add_argument('--dust_threshold', type=int, default=100)
+    parser.add_argument('--fragment_batch_size', type=int, default=100)
 
     args = parser.parse_args()
     cg = ChunkedGraph(args.cg_name)
@@ -32,7 +33,7 @@ if __name__ == "__main__":
         def __iter__(self):
             for chunk in self.chunks:
                 chunk_id = cg.get_chunk_id(layer=args.layer, x=chunk[0], y=chunk[1], z=chunk[2])
-                yield MeshTask(args.cg_name, int(chunk_id), args.mip, args.mesh_path, args.dust_threshold)
+                yield MeshTask(args.cg_name, int(chunk_id), args.mip, args.mesh_path, args.dust_threshold, args.fragment_batch_size)
 
     if args.queue_name is not None:
         with TaskQueue(queue_name=args.queue_name) as tq:

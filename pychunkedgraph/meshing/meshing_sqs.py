@@ -5,8 +5,8 @@ import numpy as np
 
 
 class MeshTask(RegisteredTask):
-    def __init__(self, cg_name, chunk_id, mip, mesh_path=None, dust_threshold=0):
-        super().__init__(cg_name, chunk_id, mip, mesh_path, dust_threshold)
+    def __init__(self, cg_name, chunk_id, mip, mesh_path=None, dust_threshold=0, fragment_batch_size=None):
+        super().__init__(cg_name, chunk_id, mip, mesh_path, dust_threshold, fragment_batch_size)
 
     def execute(self):
         cg = ChunkedGraph(self.cg_name)
@@ -18,5 +18,6 @@ class MeshTask(RegisteredTask):
             mip=mip,
             cg=cg,
             mesh_path=self.mesh_path,
-            dust_threshold=self.dust_threshold
+            dust_threshold=self.dust_threshold,
+            fragment_batch_size=self.fragment_batch_size
         )
