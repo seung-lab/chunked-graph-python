@@ -375,3 +375,13 @@ def handle_get_lvl2_graph(table_id, node_id):
     int64_as_str = request.args.get("int64_as_str", default=False, type=toboolean)
     resp = common.handle_get_layer2_graph(table_id, node_id)
     return jsonify_with_kwargs(resp, int64_as_str=int64_as_str)
+
+
+## Get expired roots -------------------------------------------------------------
+@bp.route("/table/<table_id>/delta_roots", methods=["POST"])
+@auth_requires_permission("view")
+def handle_get_delta_roots(table_id):
+    int64_as_str = request.args.get("int64_as_str", default=False, type=toboolean)
+    resp = common.handle_get_delta_roots(table_id)
+    return jsonify_with_kwargs(resp, int64_as_str=int64_as_str)
+
