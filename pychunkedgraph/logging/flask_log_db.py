@@ -65,15 +65,12 @@ class FlaskLogDatabase(object):
         entity = datastore.Entity(key)
 
         url_split = url.split("/")
-
+        request_opt_arg = None
         if request_type:
             if "?" in url_split[-1]:
                 request_type = url_split[-1].split("?")[0]
                 request_opt_arg = url_split[-1].split("?")[1]
-            else:
-                request_type = url_split[-1]
-                request_opt_arg = None
-
+            
         if len(request_data) == 0:
             request_data = None
         else:
