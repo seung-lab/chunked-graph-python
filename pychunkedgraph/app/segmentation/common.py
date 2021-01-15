@@ -20,7 +20,7 @@ from flask import current_app, g, jsonify, make_response, request
 from pychunkedgraph import __version__
 from pychunkedgraph.app import app_utils
 from pychunkedgraph.graph import attributes, cutting, exceptions as cg_exceptions, edges as cg_edges
-from pychunkedgraph.graph import segmenthistory
+from pychunkedgraph.graph import segmenthistory, misc
 from pychunkedgraph.graph.analysis import pathing
 from pychunkedgraph.meshing import mesh_analysis
 
@@ -1055,5 +1055,32 @@ def handle_is_latest_roots(table_id, is_binary):
     return is_latest
 
 def handle_get_delta_roots(table_id):
+    current_app.request_type = "get_delta_roots"
+    current_app.table_id = table_id
     cg = app_utils.get_cg(table_id)
+    try:
+        timestamp_start = request.args["timestamp_start"]
+        timestamp_start = datetime.fromtimestamp(timestamp_start, UTC)
+    except (TypeError, ValueError, KeyError) as e:
+        raise (
+            cg_exceptions.BadRequest(
+                "timestamp_start parameter is not a valid" " unix timestamp"
+            )
+        )
+
+    # Convert seconds since epoch to UTC datetime
+    try:
+        timestamp_end = float(request.args.get("timestamp_end", time.time()))
+        timestamp_end = datetime.fromtimestamp(timestamp_end, UTC)
+    except (TypeError, ValueError) as e:
+        raise (
+            cg_exceptions.BadRequest(
+                "time_stamp_end parameter is not a valid" " unix timestamp"
+            )
+        )
+    new_root_ids, expired_root_ids =misc.get_delta_roots(cg, timestamp_start, timestamp_end)
+    return {
+        'new_root_ids': new_root_ids,
+        'expired_root_ids': expired_root_ids
+    }
     

@@ -377,7 +377,7 @@ def handle_get_lvl2_graph(table_id, node_id):
     return jsonify_with_kwargs(resp, int64_as_str=int64_as_str)
 
 
-## Get expired roots -------------------------------------------------------------
+## Get new and expired roots ----------------------------------------------------
 @bp.route("/table/<table_id>/delta_roots", methods=["POST"])
 @auth_requires_permission("view")
 def handle_get_delta_roots(table_id):
