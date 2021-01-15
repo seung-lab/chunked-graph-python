@@ -1059,7 +1059,7 @@ def handle_get_delta_roots(table_id):
     current_app.table_id = table_id
     cg = app_utils.get_cg(table_id)
     try:
-        timestamp_start = request.args["timestamp_start"]
+        timestamp_start = float(request.args["timestamp_start"])
         timestamp_start = datetime.fromtimestamp(timestamp_start, UTC)
     except (TypeError, ValueError, KeyError) as e:
         raise (
