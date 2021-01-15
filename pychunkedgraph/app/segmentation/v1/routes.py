@@ -378,7 +378,7 @@ def handle_get_lvl2_graph(table_id, node_id):
 
 
 ## Get new and expired roots ----------------------------------------------------
-@bp.route("/table/<table_id>/delta_roots", methods=["POST"])
+@bp.route("/table/<table_id>/delta_roots", methods=["GET"])
 @auth_requires_permission("view")
 def handle_get_delta_roots(table_id):
     int64_as_str = request.args.get("int64_as_str", default=False, type=toboolean)
