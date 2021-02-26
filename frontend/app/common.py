@@ -4,7 +4,7 @@ import json
 import time
 import requests
 import os
-from urllib.parse import urlunparse
+import pandas as pd
 
 auth_token_file = open(os.path.join(os.path.expanduser("~"), ".cloudvolume/secrets/chunkedgraph-secret.json"))
 auth_token_json = json.loads(auth_token_file.read())
@@ -87,4 +87,9 @@ def apiRequest(args):
     filtered = 'filtered=' + args.get('filtered', 'true')
     fullURL = f"https://prodv1.flywire-daf.com/segmentation/api/v1/table/fly_v31/root/{args.get('query')}/tabular_change_log?{rootIds}&{filtered}"
     r = requests.get(fullURL, headers=auth_header)
-    return r.content
+    dataframe = pd.read_json(r.content, 'columns')
+    content = {
+        'json': dataframe.to_json(orient='records', date_format='iso'),
+        'csv': dataframe.to_csv()
+    }
+    return content

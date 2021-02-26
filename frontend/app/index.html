@@ -45,12 +45,7 @@
             </thead>
             <tbody>
                 <tr v-for="row in response">
-                    <th>{{row[0]}}</th>
-                    <td>{{row[1].operation_id}}</td>
-                    <td>{{row[1].timestamp}}</td>
-                    <td>{{row[1].user_id}}</td>
-                    <td>{{row[1].is_merge}}</td>
-                    <td>{{row[1].user_name}}</td>
+                    <td v-for="key in Object.keys(row)">{{row[key]}}</td>
                 </tr>
             </tbody>
         </table>
