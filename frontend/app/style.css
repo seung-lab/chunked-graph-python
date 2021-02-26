@@ -1,0 +1,27 @@
+
+td[align="right"] {
+    width: 120px;
+}
+
+input[type="number"] {
+    width: 440px;
+}
+
+td {
+    padding: 10px;
+}
+
+tr.hide {
+    display: none;
+}
+
+hr.bold {
+    height: 4px !important;
+    border-width: 0;
+    color: black !important;
+    background-color: black !important;
+}
+
+hr {
+    width: 50%
+}

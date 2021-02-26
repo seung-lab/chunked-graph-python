@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+    <title>Root Query</title>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW"
+        crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/vue"></script>
+    <script src="https://unpkg.com/@johmun/vue-tags-input/dist/vue-tags-input.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <table>
+            <tr>
+                <td align="right"><label for="query">Query: </label></td>
+                <td align="left">
+                    <input type="number" v-model="query.root_id" name="query">
+                    <button class="btn btn-primary" type="button" @click="apiRequest" :disabled="!isReady">
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true" v-show="loading"></span>
+                        {{ status }}
+                    </button>
+                    <button @click="exportCSV" :disabled="!response.length" class="btn btn-primary">Export CSV</button>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td align="left">
+                    <label for="historical">Show related root ids: </label>
+                    <input name="historical" type="checkbox" v-model.boolean="query.historical">
+                    <label for="filtered">Filter extra edits: </label>
+                    <input name="filtered" type="checkbox" v-model.boolean="query.filtered">
+                </td>
+            </tr>
+        </table>
+        <table class="table table-bordered" v-show="response.length">
+            <thead>
+                <tr>
+                    <th v-for="header in headers">{{header}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="row in response">
+                    <th>{{row[0]}}</th>
+                    <td>{{row[1].operation_id}}</td>
+                    <td>{{row[1].timestamp}}</td>
+                    <td>{{row[1].user_id}}</td>
+                    <td>{{row[1].is_merge}}</td>
+                    <td>{{row[1].user_name}}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <script src="scripts.js"></script>
+</body>
+
+</html>
