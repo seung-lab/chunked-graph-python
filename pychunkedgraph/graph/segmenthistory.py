@@ -340,9 +340,10 @@ class SegmentHistory(object):
 
 
 class LogEntry(object):
-    def __init__(self, row, timestamp):
+    def __init__(self, row, timestamp, logNumber=None):
         self.row = row
         self.timestamp = timestamp
+        self.logNumber = logNumber
 
     @property
     def is_merge(self):
@@ -403,10 +404,10 @@ class LogEntry(object):
         )
 
     def __str__(self):
-        return f"{self.user_id},{self.log_type},{self.root_ids},{self.timestamp}"
+        return f"{self.user_id},{self.log_type},{self.root_ids},{self.timestamp},{self.logNumber}"
 
     def __iter__(self):
-        attrs = [self.user_id, self.log_type, self.root_ids, self.timestamp]
+        attrs = [self.user_id, self.log_type, self.root_ids, self.timestamp,self.logNumber]
         for attr in attrs:
             yield attr
 
@@ -417,7 +418,7 @@ def get_all_log_entries(cg):
     for operation_id in range(cg.client.get_max_operation_id()):
         try:
             log_entries.append(
-                LogEntry(log_rows[operation_id], log_rows[operation_id]["timestamp"])
+                LogEntry(log_rows[operation_id], log_rows[operation_id]["timestamp"], operation_id)
             )
         except KeyError:
             continue

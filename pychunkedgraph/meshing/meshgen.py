@@ -100,11 +100,11 @@ def get_remapped_segmentation(
     """
     assert mip >= cg.meta.cv.mip
 
+    ws_seg = meshgen_utils.get_ws_seg_for_chunk(cg, chunk_id, mip, overlap_vx)
     sv_remapping, unsafe_dict = get_lx_overlapping_remappings(
         cg, chunk_id, time_stamp=time_stamp, n_threads=n_threads
     )
 
-    ws_seg = meshgen_utils.get_ws_seg_for_chunk(cg, chunk_id, mip, overlap_vx)
     seg = fastremap.mask_except(ws_seg, list(sv_remapping.keys()), in_place=False)
     fastremap.remap(seg, sv_remapping, preserve_missing_labels=True, in_place=True)
 
@@ -1011,14 +1011,14 @@ def chunk_initial_mesh_task(
     return result
 
 
-def get_multi_child_nodes(cg, chunk_id, node_id_subset=None, chunk_bbox_string=False):
+def get_multi_child_nodes(cg, chunk_id, node_id_subset=None, chunk_bbox_string=False, time_stamp=None):
     if node_id_subset is None:
         range_read = cg.range_read_chunk(
-            chunk_id, properties=attributes.Hierarchy.Child
+            chunk_id, properties=attributes.Hierarchy.Child, time_stamp=time_stamp
         )
     else:
         range_read = cg.client.read_nodes(
-            node_ids=node_id_subset, properties=attributes.Hierarchy.Child
+            node_ids=node_id_subset, properties=attributes.Hierarchy.Child, end_time=time_stamp
         )
 
     node_ids = np.array(list(range_read.keys()))
@@ -1219,7 +1219,7 @@ def chunk_stitch_remeshing_task(
 
 
 def chunk_initial_sharded_stitching_task(
-    cg_name, chunk_id, mip, cg=None, high_padding=1, cache=True
+    cg_name, chunk_id, mip, cg=None, high_padding=1, cache=True, time_stamp=None
 ):
     start_existence_check_time = time.time()
     if cg is None:
@@ -1228,7 +1228,7 @@ def chunk_initial_sharded_stitching_task(
     cache_string = "public" if cache else "no-cache"
 
     layer = cg.get_chunk_layer(chunk_id)
-    multi_child_nodes, multi_child_descendants = get_multi_child_nodes(cg, chunk_id)
+    multi_child_nodes, multi_child_descendants = get_multi_child_nodes(cg, chunk_id, time_stamp=time_stamp)
 
     chunk_to_id_dict = collections.defaultdict(list)
     for child_node in multi_child_descendants:
@@ -1328,13 +1328,14 @@ def chunk_initial_sharded_stitching_task(
     cf = CloudFiles(
         os.path.join(cv.cloudpath, cv.mesh.meta.mesh_path, "initial", str(layer))
     )
-    cf.put(
-        shard_filename,
-        shard_binary,
-        content_type="application/octet-stream",
-        compress=False,
-        cache_control=cache_string,
-    )
+    if WRITING_TO_CLOUD:
+        cf.put(
+            shard_filename,
+            shard_binary,
+            content_type="application/octet-stream",
+            compress=False,
+            cache_control=cache_string,
+        )
     total_time = time.time() - start_existence_check_time
 
     ret = {

@@ -12,6 +12,7 @@ if __name__ == "__main__":
     parser.add_argument('--cg_name', type=str)
     parser.add_argument('--layer', type=int)
     parser.add_argument('--mip', type=int)
+    parser.add_argument('--time_stamp', type=int, default=None)
     parser.add_argument('--skip_cache', action='store_true')
 
     args = parser.parse_args()
@@ -33,7 +34,7 @@ if __name__ == "__main__":
         def __iter__(self):
             for chunk in self.chunks:
                 chunk_id = cg.get_chunk_id(layer=args.layer, x=chunk[0], y=chunk[1], z=chunk[2])
-                yield MeshTask(args.cg_name, args.layer, int(chunk_id), args.mip, cache)
+                yield MeshTask(args.cg_name, args.layer, int(chunk_id), args.mip, cache, args.time_stamp)
 
     if args.queue_name is not None:
         with TaskQueue(queue_name=args.queue_name) as tq:
