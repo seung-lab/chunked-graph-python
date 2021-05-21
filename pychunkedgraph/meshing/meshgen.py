@@ -818,6 +818,7 @@ def remeshing(
     mip: int = 2,
     max_err: int = 40,
     time_stamp: datetime.datetime or None = None,
+    cache: bool = True
 ):
     """Given a chunkedgraph, a list of level 2 nodes, perform remeshing and stitching up the node hierarchy (or up to the stop_layer)
 
@@ -854,6 +855,7 @@ def remeshing(
             max_err=max_err,
             sharded=False,
             time_stamp=l2_time_stamp,
+            cache=cache
         )
     chunk_dicts = []
     max_layer = stop_layer or cg._n_layers
@@ -887,6 +889,45 @@ def remeshing(
                 cv_unsharded_mesh_path=cv_unsharded_mesh_path,
             )
 
+
+def get_new_l2_ids_from_log(cg, log):
+    if log.is_merge:
+        sv_ids = fastremap.unique(log.added_edges.reshape(-1))
+    else:
+        sv_ids = fastremap.unique(log.removed_edges.reshape(-1))
+    return fastremap.unique(cg.get_parents(sv_ids, time_stamp=log.timestamp))
+
+
+def remesh_edits_to_root(cg_name, root_id, cache=True, write_finished=None):
+    from pychunkedgraph.graph.segmenthistory import SegmentHistory
+    cg = ChunkedGraph(graph_id=cg_name)
+    cv_mesh_dir = cg.meta.dataset_info["mesh"]
+    cv_unsharded_mesh_dir = cg.meta.dataset_info["mesh_metadata"]["unsharded_mesh_dir"]
+    cv_unsharded_mesh_path = os.path.join(
+        cg.meta.data_source.WATERSHED, cv_mesh_dir, cv_unsharded_mesh_dir
+    )
+    mesh_data = cg.meta.custom_data["mesh"]
+    sh = SegmentHistory(cg, root_id)
+    past_log_entries = sh.past_log_entries
+    log_numbers = list(past_log_entries)
+    log_numbers.sort()
+    for log_number in log_numbers:
+        new_l2_ids_for_change = get_new_l2_ids_from_log(cg, past_log_entries[log_number])
+        remeshing(
+            cg,
+            new_l2_ids_for_change,
+            stop_layer=mesh_data["max_layer"],
+            mip=mesh_data["mip"],
+            max_err=mesh_data["max_error"],
+            cv_sharded_mesh_dir=cv_mesh_dir,
+            cv_unsharded_mesh_path=cv_unsharded_mesh_path,
+            time_stamp=past_log_entries[log_number].timestamp,
+            cache=cache
+        )
+    if write_finished:
+        cf = CloudFiles(write_finished)
+        cf.put(path=str(root_id), content='')
+            
 
 def chunk_initial_mesh_task(
     cg_name,

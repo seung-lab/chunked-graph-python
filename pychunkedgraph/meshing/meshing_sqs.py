@@ -31,3 +31,12 @@ class MeshTask(RegisteredTask):
             )
         print(result)
 
+
+class RemeshEditsTask(RegisteredTask):
+    def __init__(self, cg_name, root_id, cache=True, write_finished=None):
+        super().__init__(cg_name, root_id, cache, write_finished)
+    
+    def execute(self):
+        cg_name = self.cg_name
+        root_id = np.uint64(self.root_id)
+        meshgen.remesh_edits_to_root(cg_name, root_id, self.cache, self.write_finished)
