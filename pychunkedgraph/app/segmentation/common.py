@@ -7,7 +7,7 @@ import gzip
 import os
 import requests
 from io import BytesIO as IO
-from datetime import datetime
+from datetime import date, datetime
 from functools import reduce
 
 import numpy as np
@@ -31,7 +31,6 @@ from pychunkedgraph.graph.attributes import OperationLogs
 from pychunkedgraph.meshing import mesh_analysis
 from pychunkedgraph.graph.misc import get_contact_sites
 from middle_auth_client import get_usernames
-
 
 
 __api_versions__ = [0, 1]
@@ -598,7 +597,7 @@ def handle_rollback(table_id):
 ### USER OPERATIONS -------------------------------------------------------------
 
 
-def all_user_operations(table_id, include_undone = False):
+def all_user_operations(table_id, include_undone=False):
     # Gets all operations by the user.
     # If include_undone is false, it filters to operations that are not undone.
     # If the operation has been undone by anyone, it won't be returned here,
@@ -630,9 +629,11 @@ def all_user_operations(table_id, include_undone = False):
             valid_entry_ids.append(entry_id)
             timestamp = entry["timestamp"]
             timestamp_list.append(timestamp)
-        
-        should_check = not OperationLogs.Status in entry \
+
+        should_check = (
+            not OperationLogs.Status in entry
             or entry[OperationLogs.Status] == OperationLogs.StatusCodes.SUCCESS.value
+        )
 
         if should_check:
             # if it is an undo of another operation, mark it as undone
@@ -654,8 +655,10 @@ def all_user_operations(table_id, include_undone = False):
         entry_id = valid_entry_ids[i]
         entry = log_rows[entry_id]
 
-        if OperationLogs.UndoOperationID in entry \
-            or OperationLogs.RedoOperationID in entry:
+        if (
+            OperationLogs.UndoOperationID in entry
+            or OperationLogs.RedoOperationID in entry
+        ):
             continue
 
         undone = entry_id in undone_ids
@@ -664,10 +667,7 @@ def all_user_operations(table_id, include_undone = False):
             timestamp = entry["timestamp"]
             filtered_timestamp_list.append(timestamp)
 
-    return {
-        "operation_id": filtered_entry_ids,
-        "timestamp": filtered_timestamp_list
-    }
+    return {"operation_id": filtered_entry_ids, "timestamp": filtered_timestamp_list}
 
 
 ### CHILDREN -------------------------------------------------------------------
@@ -703,9 +703,7 @@ def handle_leaves(table_id, root_id):
     bounding_box = None
     if "bounds" in request.args:
         bounds = request.args["bounds"]
-        bounding_box = np.array(
-            [b.split("-") for b in bounds.split("_")], dtype=int
-        ).T
+        bounding_box = np.array([b.split("-") for b in bounds.split("_")], dtype=int).T
 
     cg = app_utils.get_cg(table_id)
     if stop_layer > 1:
@@ -737,9 +735,7 @@ def handle_leaves_many(table_id):
 
     if "bounds" in request.args:
         bounds = request.args["bounds"]
-        bounding_box = np.array(
-            [b.split("-") for b in bounds.split("_")], dtype=int
-        ).T
+        bounding_box = np.array([b.split("-") for b in bounds.split("_")], dtype=int).T
     else:
         bounding_box = None
 
@@ -771,9 +767,7 @@ def handle_leaves_from_leave(table_id, atomic_id):
 
     if "bounds" in request.args:
         bounds = request.args["bounds"]
-        bounding_box = np.array(
-            [b.split("-") for b in bounds.split("_")], dtype=int
-        ).T
+        bounding_box = np.array([b.split("-") for b in bounds.split("_")], dtype=int).T
     else:
         bounding_box = None
 
@@ -798,9 +792,7 @@ def handle_subgraph(table_id, root_id):
 
     if "bounds" in request.args:
         bounds = request.args["bounds"]
-        bounding_box = np.array(
-            [b.split("-") for b in bounds.split("_")], dtype=int
-        ).T
+        bounding_box = np.array([b.split("-") for b in bounds.split("_")], dtype=int).T
     else:
         bounding_box = None
 
@@ -825,21 +817,23 @@ def handle_subgraph(table_id, root_id):
 ### CHANGE LOG -----------------------------------------------------------------
 
 
-def change_log(table_id, root_id=None):
+def change_log(table_id, root_id=None, filtered=False):
     current_app.table_id = table_id
     user_id = str(g.auth_user["id"])
     current_app.user_id = user_id
 
     time_stamp_past = _parse_timestamp("timestamp", 0, return_datetime=True)
-
+    time_stamp_future = _parse_timestamp("timestamp_future", datetime.utcnow(), return_datetime=True)
     # Call ChunkedGraph
     cg = app_utils.get_cg(table_id)
     if not root_id:
         return segmenthistory.get_all_log_entries(cg)
 
-    hist = segmenthistory.SegmentHistory(cg, int(root_id))
+    history = segmenthistory.SegmentHistory(
+        cg, [int(root_id)], timestamp_past=time_stamp_past, timestamp_future=time_stamp_future
+    )
 
-    return hist.change_log()
+    return history.change_log_summary(filtered=filtered)
 
 
 def tabular_change_log_recent(table_id):
@@ -995,9 +989,7 @@ def handle_contact_sites(table_id, root_id):
 
     if "bounds" in request.args:
         bounds = request.args["bounds"]
-        bounding_box = np.array(
-            [b.split("-") for b in bounds.split("_")], dtype=int
-        ).T
+        bounding_box = np.array([b.split("-") for b in bounds.split("_")], dtype=int).T
     else:
         bounding_box = None
 
