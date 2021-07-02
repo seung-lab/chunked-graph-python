@@ -3,7 +3,7 @@ import numpy as np
 from itertools import combinations, chain
 from graph_tool import Graph, GraphView
 from graph_tool import topology, search
-
+from scipy.sparse import csr_matrix
 
 def build_gt_graph(
     edges, weights=None, is_directed=True, make_directed=False, hashed=False
@@ -41,6 +41,31 @@ def build_gt_graph(
     else:
         cap = None
     return weighted_graph, cap, edges, unique_ids
+
+
+def build_scipy_sparse_mat(
+    edges, weights, make_directed=False
+):
+    """Builds a scipy.sparse.csr_matrix
+    :param edges: n x 2 numpy array
+    :param weights: numpy array of length n
+    :return: scipy.sparse.csr_matrix
+    """
+    edges = np.array(edges, np.uint64)
+    assert len(weights) == len(edges)
+    weights = np.array(weights)
+
+    unique_ids, edges = np.unique(edges, return_inverse=True)
+    edges = edges.reshape(-1, 2)
+
+    if make_directed:
+        edges = np.concatenate([edges, edges[:, [1, 0]]])
+
+        if weights is not None:
+            weights = np.concatenate([weights, weights])
+
+    sparse_mat = csr_matrix((weights, (edges[:,0], edges[:,1])), shape=(unique_ids.shape[0], unique_ids.shape[0]))
+    return sparse_mat, edges, unique_ids
 
 
 def remap_ids_from_graph(graph_ids, unique_ids):
@@ -231,3 +256,41 @@ def flatten_edge_list(paths_e):
             for e in chain.from_iterable(x for x in paths_e)
         ]
     )
+
+
+def build_scipy_graph(
+    edges, weights=None, is_directed=True, make_directed=False, hashed=False
+):
+    """Builds a graph_tool graph
+    :param edges: n x 2 numpy array
+    :param weights: numpy array of length n
+    :param is_directed: bool
+    :param make_directed: bool
+    :param hashed: bool
+    :return: graph, capacities
+    """
+    edges = np.array(edges, np.uint64)
+    if weights is not None:
+        assert len(weights) == len(edges)
+        weights = np.array(weights)
+
+    unique_ids, edges = np.unique(edges, return_inverse=True)
+    edges = edges.reshape(-1, 2)
+
+    edges = np.array(edges)
+
+    if make_directed:
+        is_directed = True
+        edges = np.concatenate([edges, edges[:, [1, 0]]])
+
+        if weights is not None:
+            weights = np.concatenate([weights, weights])
+
+    weighted_graph = Graph(directed=is_directed)
+    weighted_graph.add_edge_list(edge_list=edges, hashed=hashed)
+
+    if weights is not None:
+        cap = weighted_graph.new_edge_property("float", vals=weights)
+    else:
+        cap = None
+    return weighted_graph, cap, edges, unique_ids
