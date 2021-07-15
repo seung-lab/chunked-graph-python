@@ -507,7 +507,7 @@ def operation_details(table_id):
 
 
 @bp.route("/table/<table_id>/delta_roots", methods=["GET"])
-@auth_requires_permission("view")
+@auth_requires_permission("develop")
 def delta_roots(table_id):
     int64_as_str = request.args.get("int64_as_str", default=False, type=toboolean)
     resp = common.delta_roots(table_id)
